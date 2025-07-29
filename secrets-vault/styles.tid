@@ -32,3 +32,19 @@ tags: $:/tags/Stylesheet
 	background-color: <<colour notification-background>>;
 	border: 1px solid <<colour notification-border>>;
 }
+
+.tc-vault-manager-fallback {
+    padding: 1em;
+    border: 1px solid <<colour table-border>>;
+    border-radius: 4px;
+}
+.tc-vault-manager-fallback input[type="password"],
+.tc-vault-manager-fallback input[type="text"] {
+    width: 250px;
+    padding: 0.5em;
+    margin: 0.5em 0;
+}
+.tc-vault-manager-fallback button {
+    padding: 0.5em 1em;
+    margin: 0.5em 0;
+}
