@@ -1,6 +1,0 @@
-title: $:/plugins/BTC/secrets-vault/language/en-GB
-type: application/x-tiddler-dictionary
-
-Buttons/Secrets/Caption: Secrets
-Buttons/Secrets/Description: Insert a secret reference
-Buttons/Secrets/Hint: Insert a secret reference from the vault
