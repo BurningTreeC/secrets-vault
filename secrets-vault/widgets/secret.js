@@ -190,17 +190,12 @@ SecretWidget.prototype.revealSecret = function(shadow, container) {
 		var hideButton = self.document.createElement("button");
 		hideButton.className = "secret-button";
 		hideButton.textContent = "🔒 " + self.secretName;
-		hideButton.title = "Click to hide";
-		hideButton.onclick = function() {
-			self.hideSecret(shadow, container);
-		};
-		container.appendChild(hideButton);
+		hideButton.title = "Click to hide, Ctrl+Click to copy";
 		
 		// Create revealed secret span
 		var secretSpan = self.document.createElement("span");
 		secretSpan.className = "secret-revealed";
 		secretSpan.textContent = secret;
-		container.appendChild(secretSpan);
 		
 		// Create copy button
 		var copyButton = self.document.createElement("button");
@@ -209,6 +204,23 @@ SecretWidget.prototype.revealSecret = function(shadow, container) {
 		copyButton.onclick = function() {
 			self.copyToClipboard(secret, copyButton);
 		};
+		
+		// Now add the event listener with copyButton in scope
+		hideButton.addEventListener("click", function(event) {
+			// Check for Ctrl+Click (Windows/Linux) or Cmd+Click (Mac)
+			if(event.ctrlKey || event.metaKey) {
+				event.preventDefault();
+				event.stopPropagation();
+				event.stopImmediatePropagation();
+				self.copyToClipboard(secret, copyButton);
+				return false;
+			}
+			self.hideSecret(shadow, container);
+		}, false);
+		
+		// Append all elements
+		container.appendChild(hideButton);
+		container.appendChild(secretSpan);
 		container.appendChild(copyButton);
 		
 		// Auto-hide after configured timeout (default 8 seconds)
@@ -259,16 +271,24 @@ SecretWidget.prototype.revealSecretFallback = function(container) {
 		var paletteData = palette ? $tw.wiki.getTiddlerDataCached(palette) : {};
 		var codeBackgroundColor = paletteData["code-background"] || "#f0f0f0";
 		
-		container.innerHTML = '<button class="tc-btn-invisible tc-tiddlylink">🔒 ' + 
+		container.innerHTML = '<button class="tc-btn-invisible tc-tiddlylink" title="Click to hide, Ctrl+Click to copy">🔒 ' + 
 			$tw.utils.htmlEncode(self.secretName) + '</button>' +
 			'<span style="background:' + codeBackgroundColor + ';padding:2px 6px;border-radius:3px;font-family:monospace;margin-left:4px;">' +
 			$tw.utils.htmlEncode(secret) + '</span> ' +
 			'<button class="tc-btn-invisible" style="color:#28a745;">Copy</button>';
 		
 		// Make button clickable to hide
-		container.firstChild.onclick = function() {
+		container.firstChild.addEventListener("click", function(event) {
+			// Check for Ctrl+Click (Windows/Linux) or Cmd+Click (Mac)
+			if(event.ctrlKey || event.metaKey) {
+				event.preventDefault();
+				event.stopPropagation();
+				event.stopImmediatePropagation();
+				self.copyToClipboard(secret, container.lastChild);
+				return false;
+			}
 			self.hideSecretFallback(container);
-		};
+		}, false);
 		
 		// Copy button
 		container.lastChild.onclick = function() {
@@ -299,9 +319,18 @@ SecretWidget.prototype.hideSecret = function(shadow, container) {
 	var revealButton = this.document.createElement("button");
 	revealButton.className = "secret-button";
 	revealButton.textContent = "🔒 " + this.secretName;
-	revealButton.onclick = function() {
+	revealButton.title = "Click to reveal, Ctrl+Click to copy";
+	revealButton.addEventListener("click", function(event) {
+		// Check for Ctrl+Click (Windows/Linux) or Cmd+Click (Mac)
+		if(event.ctrlKey || event.metaKey) {
+			event.preventDefault();
+			event.stopPropagation();
+			event.stopImmediatePropagation();
+			self.copySecretDirectly();
+			return false;
+		}
 		self.revealSecret(shadow, container);
-	};
+	}, false);
 	
 	container.appendChild(revealButton);
 };
@@ -315,11 +344,19 @@ SecretWidget.prototype.hideSecretFallback = function(container) {
 		this.autoHideTimeout = null;
 	}
 	
-	container.innerHTML = '<button class="tc-btn-invisible tc-tiddlylink">🔒 ' + 
+	container.innerHTML = '<button class="tc-btn-invisible tc-tiddlylink" title="Click to reveal, Ctrl+Click to copy">🔒 ' + 
 		$tw.utils.htmlEncode(this.secretName) + '</button>';
-	container.firstChild.onclick = function() {
+	container.firstChild.addEventListener("click", function(event) {
+		// Check for Ctrl+Click (Windows/Linux) or Cmd+Click (Mac)
+		if(event.ctrlKey || event.metaKey) {
+			event.preventDefault();
+			event.stopPropagation();
+			event.stopImmediatePropagation();
+			self.copySecretDirectly();
+			return false;
+		}
 		self.revealSecretFallback(container);
-	};
+	}, false);
 };
 
 SecretWidget.prototype.copyToClipboard = function(text, button) {
