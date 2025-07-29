@@ -116,7 +116,6 @@ Configure how long secrets remain visible:
 ```
 plugins/BTC/secrets-vault/
 ├── plugin.info          # Plugin metadata
-├── README.md           # This file
 ├── readme.tid          # TiddlyWiki documentation
 ├── secrets-manager.js  # Core encryption logic
 ├── startup.js          # Plugin initialization
