@@ -397,7 +397,7 @@ SecretsManager.prototype.addSecret = function(name, value) {
 		var vault = $tw.wiki.getTiddler("$:/secrets/vault") || {};
 		var fields = Object.assign({}, vault.fields);
 		fields["secret-" + name] = encrypted;
-		fields["secret-meta-" + name] = JSON.stringify({
+		fields["meta-" + name] = JSON.stringify({
 			created: Date.now(),
 			modified: Date.now()
 		});
@@ -430,7 +430,7 @@ SecretsManager.prototype.listSecrets = function() {
 	
 	var secrets = [];
 	$tw.utils.each(vault.fields, function(value, name) {
-		if(name.indexOf("secret-") === 0 && name.indexOf("secret-meta-") !== 0) {
+		if(name.indexOf("secret-") === 0) {
 			secrets.push(name.substring(7));
 		}
 	});
@@ -452,7 +452,7 @@ SecretsManager.prototype.deleteSecret = function(name) {
 	
 	var fields = Object.assign({}, vault.fields);
 	delete fields["secret-" + name];
-	delete fields["secret-meta-" + name];
+	delete fields["meta-" + name];
 	// Create a new tiddler with only the remaining fields
 	$tw.wiki.addTiddler(new $tw.Tiddler(fields));
 	
@@ -491,7 +491,7 @@ SecretsManager.prototype.changePassword = function(oldPassword, newPassword) {
 						secrets[name.substring(7)] = decrypted;
 					})
 				);
-			} else if(name.indexOf("secret-meta-") === 0) {
+			} else if(name.indexOf("meta-") === 0) {
 				metadata[name] = value;
 			}
 		});
@@ -529,7 +529,7 @@ SecretsManager.prototype.changePassword = function(oldPassword, newPassword) {
 					self.encrypt(value).then(function(encrypted) {
 						newFields["secret-" + name] = encrypted;
 						// Update modified time in metadata
-						var metaKey = "secret-meta-" + name;
+						var metaKey = "meta-" + name;
 						if(newFields[metaKey]) {
 							try {
 								var meta = JSON.parse(newFields[metaKey]);
