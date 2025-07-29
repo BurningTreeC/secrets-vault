@@ -1,0 +1,5 @@
+title: $:/plugins/BTC/secrets-vault/ui/tools-menu
+tags: $:/tags/ControlPanel
+caption: Secrets Vault
+
+<$vault-manager/>

@@ -1,0 +1,34 @@
+title: $:/plugins/BTC/secrets-vault/styles
+tags: $:/tags/Stylesheet
+
+.tc-secret-widget {
+	display: inline-block;
+	vertical-align: middle;
+}
+
+.tc-editor-toolbar-secrets-dropdown {
+	min-width: 200px;
+}
+
+.tc-editor-toolbar-secrets-dropdown .tc-dropdown-item {
+	padding: 4px 8px;
+}
+
+.tc-editor-toolbar-secrets-dropdown .tc-dropdown-item:hover {
+	background-color: <<colour dropdown-item-background-hover>>;
+}
+
+.tc-vault-manager-widget {
+	border: 1px solid <<colour table-border>>;
+	border-radius: 4px;
+	background-color: <<colour background>>;
+}
+
+/* Fallback styles for non-shadow DOM browsers */
+.tc-message-box {
+	padding: 0.5em 1em;
+	margin: 1em 0;
+	border-radius: 4px;
+	background-color: <<colour notification-background>>;
+	border: 1px solid <<colour notification-border>>;
+}
