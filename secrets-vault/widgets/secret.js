@@ -114,17 +114,17 @@ SecretWidget.prototype.render = function(parent,nextSibling) {
 		revealButton.className = "secret-button";
 		revealButton.textContent = "🔒 " + this.secretName;
 		revealButton.title = "Click to reveal, Ctrl+Click to copy";
-		revealButton.onclick = function(event) {
+		revealButton.addEventListener("click", function(event) {
 			// Check for Ctrl+Click (Windows/Linux) or Cmd+Click (Mac)
 			if(event.ctrlKey || event.metaKey) {
 				event.preventDefault();
 				event.stopPropagation();
+				event.stopImmediatePropagation();
 				self.copySecretDirectly();
 				return false;
-			} else {
-				self.revealSecret(shadow, secretContainer);
 			}
-		};
+			self.revealSecret(shadow, secretContainer);
+		}, false);
 		
 		secretContainer.appendChild(revealButton);
 		shadow.appendChild(secretContainer);
@@ -132,17 +132,17 @@ SecretWidget.prototype.render = function(parent,nextSibling) {
 		// Fallback for browsers without Shadow DOM
 		container.innerHTML = '<button class="tc-btn-invisible tc-tiddlylink">🔒 ' + 
 			$tw.utils.htmlEncode(this.secretName) + '</button>';
-		container.firstChild.onclick = function(event) {
+		container.firstChild.addEventListener("click", function(event) {
 			// Check for Ctrl+Click (Windows/Linux) or Cmd+Click (Mac)
 			if(event.ctrlKey || event.metaKey) {
 				event.preventDefault();
 				event.stopPropagation();
+				event.stopImmediatePropagation();
 				self.copySecretDirectly();
 				return false;
-			} else {
-				self.revealSecretFallback(container);
 			}
-		};
+			self.revealSecretFallback(container);
+		}, false);
 	}
 	
 	parent.insertBefore(container,nextSibling);
