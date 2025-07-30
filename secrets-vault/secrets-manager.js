@@ -29,6 +29,8 @@ function SecretsManager() {
 	this.salt = null;
 	this.attempts = 0;
 	this.lockedUntil = 0;
+	this.autoLockTimer = null;
+	this.lastActivity = Date.now();
 	
 	// Secure the crypto object
 	if(this.crypto && this.crypto.subtle) {
@@ -276,9 +278,57 @@ SecretsManager.prototype.clearSensitiveData = function() {
 	this.key = null;
 	this.hmacKey = null;
 	
+	// Clear auto-lock timer
+	if(this.autoLockTimer) {
+		clearTimeout(this.autoLockTimer);
+		this.autoLockTimer = null;
+	}
+	
 	// Force garbage collection if available
 	if(typeof window.gc === "function") {
 		window.gc();
+	}
+};
+
+SecretsManager.prototype.resetAutoLockTimer = function() {
+	var self = this;
+	
+	// Clear existing timer
+	if(this.autoLockTimer) {
+		clearTimeout(this.autoLockTimer);
+	}
+	
+	// Get timeout value from config (in minutes, default 10)
+	var timeoutMinutes = parseInt($tw.wiki.getTiddlerText("$:/config/SecretsVault/AutoLockTimeout", "10"), 10);
+	
+	// If timeout is 0, auto-lock is disabled
+	if(timeoutMinutes === 0 || !this.isUnlocked()) {
+		return;
+	}
+	
+	// Convert to milliseconds
+	var timeoutMs = timeoutMinutes * 60 * 1000;
+	
+	// Set new timer
+	this.autoLockTimer = setTimeout(function() {
+		self.lock();
+		// Show notification if TW notifier is available
+		if($tw.notifier) {
+			$tw.notifier.display("$:/temp/vault-locked", {
+				title: "Vault Auto-Locked",
+				text: "The secrets vault has been locked due to inactivity"
+			});
+		}
+	}, timeoutMs);
+	
+	// Update last activity timestamp
+	this.lastActivity = Date.now();
+};
+
+SecretsManager.prototype.updateActivity = function() {
+	// Reset the auto-lock timer on any vault activity
+	if(this.isUnlocked()) {
+		this.resetAutoLockTimer();
 	}
 };
 
@@ -353,6 +403,8 @@ SecretsManager.prototype.unlock = function(password) {
 			self.lockedUntil = 0;
 			// Trigger refresh by touching a state tiddler
 			$tw.wiki.addTiddler({title: "$:/state/vault/unlocked", text: "yes"});
+			// Start auto-lock timer
+			self.resetAutoLockTimer();
 			return true;
 		} else {
 			throw new Error("Invalid password");
@@ -385,13 +437,16 @@ SecretsManager.prototype.addSecret = function(name, value) {
 		return Promise.reject(new Error("Vault is locked"));
 	}
 	
+	// Update activity for auto-lock
+	this.updateActivity();
+	
 	// Validate secret name
 	if(!name || typeof name !== "string" || name.length === 0) {
 		return Promise.reject(new Error("Invalid secret name"));
 	}
 	
 	// Sanitize name to prevent injection
-	name = name.replace(/[^a-zA-Z0-9-_]/g, "");
+	name = name.replace(/[^a-zA-Z0-9-_ ]/g, "");
 	
 	return this.encrypt(value).then(function(encrypted) {
 		var vault = $tw.wiki.getTiddler("$:/secrets/vault") || {};
@@ -411,8 +466,11 @@ SecretsManager.prototype.getSecret = function(name) {
 		return Promise.reject(new Error("Vault is locked"));
 	}
 	
+	// Update activity for auto-lock
+	this.updateActivity();
+	
 	// Sanitize name
-	name = name.replace(/[^a-zA-Z0-9-_]/g, "");
+	name = name.replace(/[^a-zA-Z0-9-_ ]/g, "");
 	
 	var vault = $tw.wiki.getTiddler("$:/secrets/vault");
 	if(!vault || !vault.fields["secret-" + name]) {
@@ -423,6 +481,11 @@ SecretsManager.prototype.getSecret = function(name) {
 };
 
 SecretsManager.prototype.listSecrets = function() {
+	// Update activity for auto-lock if unlocked
+	if(this.isUnlocked()) {
+		this.updateActivity();
+	}
+	
 	var vault = $tw.wiki.getTiddler("$:/secrets/vault");
 	if(!vault) {
 		return [];
@@ -442,8 +505,11 @@ SecretsManager.prototype.deleteSecret = function(name) {
 		return Promise.reject(new Error("Vault is locked"));
 	}
 	
+	// Update activity for auto-lock
+	this.updateActivity();
+	
 	// Sanitize name
-	name = name.replace(/[^a-zA-Z0-9-_]/g, "");
+	name = name.replace(/[^a-zA-Z0-9-_ ]/g, "");
 	
 	var vault = $tw.wiki.getTiddler("$:/secrets/vault");
 	if(!vault || !vault.fields["secret-" + name]) {

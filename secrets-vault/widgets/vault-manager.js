@@ -424,7 +424,7 @@ VaultManagerWidget.prototype.renderManage = function() {
 			var row = self.document.createElement("tr");
 			var nameCell = self.document.createElement("td");
 			nameCell.textContent = "🔐 " + secret;
-			nameCell.id = "secret-name-" + secret;
+			nameCell.id = "secret-name-" + secret.replace(/\s/g, "-");
 			var actionsCell = self.document.createElement("td");
 			
 			// Create button container
@@ -439,7 +439,7 @@ VaultManagerWidget.prototype.renderManage = function() {
 				viewBtn.textContent = "View";
 				viewBtn.onclick = function() {
 					$tw.secretsManager.getSecret(secretName).then(function(secretValue) {
-						var nameElement = self.shadow.getElementById("secret-name-" + secretName);
+						var nameElement = self.shadow.getElementById("secret-name-" + secretName.replace(/\s/g, "-"));
 						if(nameElement) {
 							// Toggle between showing name and value
 							if(nameElement.dataset.showing === "value") {
@@ -601,6 +601,60 @@ VaultManagerWidget.prototype.renderManage = function() {
 	changePasswordForm.appendChild(changePasswordButton);
 	changePasswordSection.appendChild(changePasswordForm);
 	this.shadow.appendChild(changePasswordSection);
+	
+	// Auto-lock settings section
+	var autoLockSection = this.document.createElement("div");
+	autoLockSection.className = "vault-section";
+	
+	var autoLockTitle = this.document.createElement("div");
+	autoLockTitle.className = "vault-title";
+	autoLockTitle.textContent = "Auto-Lock Settings";
+	autoLockSection.appendChild(autoLockTitle);
+	
+	var autoLockForm = this.document.createElement("div");
+	autoLockForm.className = "vault-form";
+	
+	// Get current timeout value
+	var currentTimeout = parseInt($tw.wiki.getTiddlerText("$:/config/SecretsVault/AutoLockTimeout", "10"), 10);
+	
+	var timeoutLabel = this.document.createElement("label");
+	timeoutLabel.textContent = "Auto-lock timeout (minutes, 0 to disable):";
+	autoLockForm.appendChild(timeoutLabel);
+	
+	var timeoutInput = this.document.createElement("input");
+	timeoutInput.type = "number";
+	timeoutInput.min = "0";
+	timeoutInput.max = "1440"; // Max 24 hours
+	timeoutInput.value = currentTimeout;
+	timeoutInput.placeholder = "Minutes (0 to disable)";
+	autoLockForm.appendChild(timeoutInput);
+	
+	var saveTimeoutButton = this.document.createElement("button");
+	saveTimeoutButton.textContent = "Save Settings";
+	saveTimeoutButton.onclick = function() {
+		var newTimeout = parseInt(timeoutInput.value, 10);
+		if(isNaN(newTimeout) || newTimeout < 0) {
+			self.showStatus("Invalid timeout value", true);
+			return;
+		}
+		
+		// Save the new timeout value
+		$tw.wiki.addTiddler({
+			title: "$:/config/SecretsVault/AutoLockTimeout",
+			text: newTimeout.toString()
+		});
+		
+		// Reset the timer with new value
+		if($tw.secretsManager && $tw.secretsManager.isUnlocked()) {
+			$tw.secretsManager.resetAutoLockTimer();
+		}
+		
+		self.showStatus("Auto-lock timeout updated to " + (newTimeout === 0 ? "disabled" : newTimeout + " minutes"));
+	};
+	
+	autoLockForm.appendChild(saveTimeoutButton);
+	autoLockSection.appendChild(autoLockForm);
+	this.shadow.appendChild(autoLockSection);
 };
 
 VaultManagerWidget.prototype.showStatus = function(message, isError) {
