@@ -15,10 +15,14 @@ A highly secure secrets vault plugin for TiddlyWiki5 that uses the Web Crypto AP
 ### 💡 User-Friendly
 - **WikiText syntax**: `§[secret:name]` to embed secrets
 - **Click to reveal** secrets in your tiddlers
+- **Copy button** for quick copying when vault is unlocked
 - **Ctrl+Click** (Cmd+Click on Mac) to copy without revealing
 - **Auto-hide** secrets after configurable timeout (default 8 seconds)
+- **Auto-lock** vault after inactivity (configurable, default 10 minutes)
 - **Editor toolbar** integration for easy secret insertion
+- **Password visibility toggle** for all password inputs
 - **Password change** functionality without losing secrets
+- **Spaces allowed** in secret names for better readability
 
 ### 🎨 Adaptive UI
 - Automatically adapts to TiddlyWiki color palettes
@@ -42,8 +46,9 @@ A highly secure secrets vault plugin for TiddlyWiki5 that uses the Web Crypto AP
 ### Adding Secrets
 
 1. Unlock the vault with your master password
-2. Enter a name and value for your secret
-3. Click "Add Secret"
+2. Enter a name and value for your secret (spaces allowed in names)
+3. Use the eye button to toggle password visibility
+4. Click "Add Secret"
 
 ### Using Secrets in Tiddlers
 
@@ -51,11 +56,13 @@ To reference a secret in your tiddlers:
 
 ```
 §[secret:my-api-key]
-§[secret:password123]
+§[secret:Database Password]
+§[secret:GitHub Token]
 ```
 
 This renders as a locked button:
 - **Click** to reveal the secret
+- **Copy button** appears when vault is unlocked
 - **Ctrl+Click** (Cmd+Click on Mac) to copy directly to clipboard
 - Secrets auto-hide after 8 seconds (configurable)
 
@@ -64,6 +71,17 @@ This renders as a locked button:
 Use the 🔐 button in the editor toolbar to:
 - Browse and insert existing secrets
 - Access the vault manager
+
+### Vault Manager Features
+
+The vault manager provides:
+- **Password visibility toggle**: Eye button on all password fields
+- **Secret management**: View, Copy, and Delete buttons for each secret
+- **View button**: Temporarily reveals secret value in place
+- **Copy button**: Quick copy with visual feedback
+- **Auto-lock configuration**: Set inactivity timeout
+- **Alphabetical sorting**: Secrets listed by name
+- **Activity tracking**: Auto-lock timer resets on any vault operation
 
 ## Security Implementation
 
@@ -94,6 +112,13 @@ Configure how long secrets remain visible:
 - Tiddler: `$:/config/SecretsVault/AutoHideTimeout`
 - Default: 8000 milliseconds (8 seconds)
 
+### Auto-Lock Timeout
+Configure automatic vault locking after inactivity:
+- Tiddler: `$:/config/SecretsVault/AutoLockTimeout`
+- Default: 10 minutes
+- Set to 0 to disable auto-lock
+- Configurable through vault manager UI
+
 ## Technical Details
 
 ### Storage
@@ -119,6 +144,9 @@ plugins/BTC/secrets-vault/
 ├── readme.tid          # TiddlyWiki documentation
 ├── secrets-manager.js  # Core encryption logic
 ├── startup.js          # Plugin initialization
+├── config/             # Configuration tiddlers
+│   ├── AutoHideTimeout.tid
+│   └── AutoLockTimeout.tid
 ├── parsers/
 │   └── secretrule.js   # WikiText parser
 ├── widgets/
@@ -151,7 +179,7 @@ This plugin is part of TiddlyWiki5 and follows the same license terms.
 
 - **Author**: Simon Huber
 - **Plugin Type**: TiddlyWiki5 Plugin
-- **Version**: 0.0.1
+- **Version**: 0.0.3
 
 ## Security Disclosure
 
