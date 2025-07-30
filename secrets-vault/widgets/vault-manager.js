@@ -93,7 +93,11 @@ VaultManagerWidget.prototype.getStyles = function() {
 		".vault-status { padding: 0.5em; background: " + notificationBackgroundColor + "; border-radius: 4px; margin-bottom: 1em; }",
 		".vault-status.error { background: #ffebee; }",
 		".vault-form { display: flex; flex-direction: column; gap: 0.5em; max-width: 300px; }",
-		"input { padding: 0.5em; border: 1px solid " + tableBorderColor + "; border-radius: 3px; background: " + backgroundColor + "; color: " + foregroundColor + "; }",
+		".password-wrapper { position: relative; display: flex; align-items: center; }",
+		".password-wrapper input { padding-right: 2.5em; }",
+		"input { padding: 0.5em; border: 1px solid " + tableBorderColor + "; border-radius: 3px; background: " + backgroundColor + "; color: " + foregroundColor + "; width: 100%; box-sizing: border-box; }",
+		".toggle-password { position: absolute; right: 0.5em; background: none; border: none; cursor: pointer; padding: 0.25em; color: " + mutedForegroundColor + "; }",
+		".toggle-password:hover { color: " + foregroundColor + "; }",
 		"button { ",
 		"  padding: 0.5em 1em;",
 		"  background: " + tagBackgroundColor + ";",
@@ -111,6 +115,37 @@ VaultManagerWidget.prototype.getStyles = function() {
 		".secrets-table td { padding: 0.5em; border-bottom: 1px solid " + tableBorderColor + "; }",
 		".delete-btn { background: #dc3545; padding: 0.25em 0.5em; font-size: 0.9em; }"
 	].join("\n");
+};
+
+VaultManagerWidget.prototype.createPasswordInput = function(placeholder) {
+	var self = this;
+	
+	var wrapper = this.document.createElement("div");
+	wrapper.className = "password-wrapper";
+	
+	var input = this.document.createElement("input");
+	input.type = "password";
+	input.placeholder = placeholder;
+	
+	var toggleButton = this.document.createElement("button");
+	toggleButton.className = "toggle-password";
+	toggleButton.type = "button";
+	toggleButton.tabIndex = -1;
+	toggleButton.innerHTML = "👁";
+	toggleButton.onclick = function() {
+		if(input.type === "password") {
+			input.type = "text";
+			toggleButton.innerHTML = "👁‍🗨";
+		} else {
+			input.type = "password";
+			toggleButton.innerHTML = "👁";
+		}
+	};
+	
+	wrapper.appendChild(input);
+	wrapper.appendChild(toggleButton);
+	
+	return {wrapper: wrapper, input: input};
 };
 
 VaultManagerWidget.prototype.renderContent = function() {
@@ -155,15 +190,13 @@ VaultManagerWidget.prototype.renderInitialize = function() {
 	var form = this.document.createElement("div");
 	form.className = "vault-form";
 	
-	var passwordInput = this.document.createElement("input");
-	passwordInput.type = "password";
-	passwordInput.placeholder = "Enter master password (min 8 chars)";
-	form.appendChild(passwordInput);
+	var passwordField = this.createPasswordInput("Enter master password (min 8 chars)");
+	var passwordInput = passwordField.input;
+	form.appendChild(passwordField.wrapper);
 	
-	var confirmInput = this.document.createElement("input");
-	confirmInput.type = "password";
-	confirmInput.placeholder = "Confirm password";
-	form.appendChild(confirmInput);
+	var confirmField = this.createPasswordInput("Confirm password");
+	var confirmInput = confirmField.input;
+	form.appendChild(confirmField.wrapper);
 	
 	var button = this.document.createElement("button");
 	button.textContent = "Initialize Vault";
@@ -224,10 +257,9 @@ VaultManagerWidget.prototype.renderUnlock = function() {
 	var form = this.document.createElement("div");
 	form.className = "vault-form";
 	
-	var passwordInput = this.document.createElement("input");
-	passwordInput.type = "password";
-	passwordInput.placeholder = "Enter master password";
-	form.appendChild(passwordInput);
+	var passwordField = this.createPasswordInput("Enter master password");
+	var passwordInput = passwordField.input;
+	form.appendChild(passwordField.wrapper);
 	
 	var button = this.document.createElement("button");
 	button.textContent = "Unlock";
@@ -310,10 +342,9 @@ VaultManagerWidget.prototype.renderManage = function() {
 	nameInput.placeholder = "Secret name";
 	addForm.appendChild(nameInput);
 	
-	var valueInput = this.document.createElement("input");
-	valueInput.type = "password";
-	valueInput.placeholder = "Secret value";
-	addForm.appendChild(valueInput);
+	var valueField = this.createPasswordInput("Secret value");
+	var valueInput = valueField.input;
+	addForm.appendChild(valueField.wrapper);
 	
 	var addButton = this.document.createElement("button");
 	addButton.textContent = "Add Secret";
@@ -436,20 +467,17 @@ VaultManagerWidget.prototype.renderManage = function() {
 	var changePasswordForm = this.document.createElement("div");
 	changePasswordForm.className = "vault-form";
 	
-	var oldPasswordInput = this.document.createElement("input");
-	oldPasswordInput.type = "password";
-	oldPasswordInput.placeholder = "Current password";
-	changePasswordForm.appendChild(oldPasswordInput);
+	var oldPasswordField = this.createPasswordInput("Current password");
+	var oldPasswordInput = oldPasswordField.input;
+	changePasswordForm.appendChild(oldPasswordField.wrapper);
 	
-	var newPasswordInput = this.document.createElement("input");
-	newPasswordInput.type = "password";
-	newPasswordInput.placeholder = "New password (min 8 chars)";
-	changePasswordForm.appendChild(newPasswordInput);
+	var newPasswordField = this.createPasswordInput("New password (min 8 chars)");
+	var newPasswordInput = newPasswordField.input;
+	changePasswordForm.appendChild(newPasswordField.wrapper);
 	
-	var confirmPasswordInput = this.document.createElement("input");
-	confirmPasswordInput.type = "password";
-	confirmPasswordInput.placeholder = "Confirm new password";
-	changePasswordForm.appendChild(confirmPasswordInput);
+	var confirmPasswordField = this.createPasswordInput("Confirm new password");
+	var confirmPasswordInput = confirmPasswordField.input;
+	changePasswordForm.appendChild(confirmPasswordField.wrapper);
 	
 	var changePasswordButton = this.document.createElement("button");
 	changePasswordButton.textContent = "Change Password";
