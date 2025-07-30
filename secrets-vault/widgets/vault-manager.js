@@ -113,7 +113,10 @@ VaultManagerWidget.prototype.getStyles = function() {
 		".secrets-table { width: 100%; border-collapse: collapse; margin-top: 1em; }",
 		".secrets-table th { text-align: left; padding: 0.5em; background: " + tableHeaderBackgroundColor + "; }",
 		".secrets-table td { padding: 0.5em; border-bottom: 1px solid " + tableBorderColor + "; }",
-		".delete-btn { background: #dc3545; padding: 0.25em 0.5em; font-size: 0.9em; }"
+		".table-buttons { display: flex; gap: 0.25em; }",
+		".view-btn { background: #17a2b8; padding: 0.25em 0.5em; font-size: 0.9em; color: white; }",
+		".copy-btn { background: #28a745; padding: 0.25em 0.5em; font-size: 0.9em; color: white; }",
+		".delete-btn { background: #dc3545; padding: 0.25em 0.5em; font-size: 0.9em; color: white; }"
 	].join("\n");
 };
 
@@ -421,12 +424,77 @@ VaultManagerWidget.prototype.renderManage = function() {
 			var row = self.document.createElement("tr");
 			var nameCell = self.document.createElement("td");
 			nameCell.textContent = "🔐 " + secret;
+			nameCell.id = "secret-name-" + secret;
 			var actionsCell = self.document.createElement("td");
-			var deleteBtn = self.document.createElement("button");
-			deleteBtn.className = "delete-btn";
-			deleteBtn.textContent = "Delete";
+			
+			// Create button container
+			var buttonContainer = self.document.createElement("div");
+			buttonContainer.className = "table-buttons";
+			
 			// Create a closure to capture the secret value
 			(function(secretName) {
+				// View button
+				var viewBtn = self.document.createElement("button");
+				viewBtn.className = "view-btn";
+				viewBtn.textContent = "View";
+				viewBtn.onclick = function() {
+					$tw.secretsManager.getSecret(secretName).then(function(secretValue) {
+						var nameElement = self.shadow.getElementById("secret-name-" + secretName);
+						if(nameElement) {
+							// Toggle between showing name and value
+							if(nameElement.dataset.showing === "value") {
+								nameElement.textContent = "🔐 " + secretName;
+								nameElement.dataset.showing = "name";
+								viewBtn.textContent = "View";
+							} else {
+								nameElement.textContent = secretValue;
+								nameElement.dataset.showing = "value";
+								viewBtn.textContent = "Hide";
+								// Auto-hide after 8 seconds
+								setTimeout(function() {
+									if(nameElement.dataset.showing === "value") {
+										nameElement.textContent = "🔐 " + secretName;
+										nameElement.dataset.showing = "name";
+										viewBtn.textContent = "View";
+									}
+								}, 8000);
+							}
+						}
+					}).catch(function(error) {
+						self.showStatus("Error: " + error.message, true);
+					});
+				};
+				
+				// Copy button
+				var copyBtn = self.document.createElement("button");
+				copyBtn.className = "copy-btn";
+				copyBtn.textContent = "Copy";
+				copyBtn.onclick = function() {
+					$tw.secretsManager.getSecret(secretName).then(function(secretValue) {
+						if(navigator.clipboard && navigator.clipboard.writeText) {
+							navigator.clipboard.writeText(secretValue).then(function() {
+								self.showStatus("Secret copied to clipboard!");
+								// Visual feedback
+								var originalText = copyBtn.textContent;
+								copyBtn.textContent = "Copied!";
+								setTimeout(function() {
+									copyBtn.textContent = originalText;
+								}, 2000);
+							}).catch(function() {
+								self.fallbackCopy(secretValue);
+							});
+						} else {
+							self.fallbackCopy(secretValue);
+						}
+					}).catch(function(error) {
+						self.showStatus("Error: " + error.message, true);
+					});
+				};
+				
+				// Delete button
+				var deleteBtn = self.document.createElement("button");
+				deleteBtn.className = "delete-btn";
+				deleteBtn.textContent = "Delete";
 				deleteBtn.onclick = function() {
 					if(confirm("Are you sure you want to delete this secret?")) {
 						if($tw.secretsManager) {
@@ -439,8 +507,13 @@ VaultManagerWidget.prototype.renderManage = function() {
 						}
 					}
 				};
+				
+				buttonContainer.appendChild(viewBtn);
+				buttonContainer.appendChild(copyBtn);
+				buttonContainer.appendChild(deleteBtn);
 			})(secret);
-			actionsCell.appendChild(deleteBtn);
+			
+			actionsCell.appendChild(buttonContainer);
 			row.appendChild(nameCell);
 			row.appendChild(actionsCell);
 			tbody.appendChild(row);
@@ -539,6 +612,22 @@ VaultManagerWidget.prototype.showStatus = function(message, isError) {
 	setTimeout(function() {
 		status.remove();
 	}, 3000);
+};
+
+VaultManagerWidget.prototype.fallbackCopy = function(text) {
+	var textArea = this.document.createElement("textarea");
+	textArea.value = text;
+	textArea.style.position = "fixed";
+	textArea.style.top = "-9999px";
+	this.document.body.appendChild(textArea);
+	textArea.select();
+	try {
+		this.document.execCommand("copy");
+		this.showStatus("Secret copied to clipboard!");
+	} catch(err) {
+		this.showStatus("Failed to copy", true);
+	}
+	this.document.body.removeChild(textArea);
 };
 
 /*
