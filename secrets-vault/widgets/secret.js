@@ -127,11 +127,32 @@ SecretWidget.prototype.render = function(parent,nextSibling) {
 		}, false);
 		
 		secretContainer.appendChild(revealButton);
+		
+		// Add copy button if vault is unlocked
+		if($tw.secretsManager && $tw.secretsManager.isUnlocked()) {
+			var copyButton = this.document.createElement("button");
+			copyButton.className = "copy-button";
+			copyButton.textContent = "Copy";
+			copyButton.onclick = function() {
+				self.copySecretDirectly(this);
+			};
+			secretContainer.appendChild(copyButton);
+		}
+		
 		shadow.appendChild(secretContainer);
 	} else {
 		// Fallback for browsers without Shadow DOM
 		container.innerHTML = '<button class="tc-btn-invisible tc-tiddlylink">🔒 ' + 
 			$tw.utils.htmlEncode(this.secretName) + '</button>';
+		
+		// Add copy button if vault is unlocked
+		if($tw.secretsManager && $tw.secretsManager.isUnlocked()) {
+			container.innerHTML += ' <button class="tc-btn-invisible" style="color:#28a745;">Copy</button>';
+			container.lastChild.onclick = function() {
+				self.copySecretDirectly(this);
+			};
+		}
+		
 		container.firstChild.addEventListener("click", function(event) {
 			// Check for Ctrl+Click (Windows/Linux) or Cmd+Click (Mac)
 			if(event.ctrlKey || event.metaKey) {
@@ -333,6 +354,17 @@ SecretWidget.prototype.hideSecret = function(shadow, container) {
 	}, false);
 	
 	container.appendChild(revealButton);
+	
+	// Add copy button if vault is unlocked
+	if($tw.secretsManager && $tw.secretsManager.isUnlocked()) {
+		var copyButton = this.document.createElement("button");
+		copyButton.className = "copy-button";
+		copyButton.textContent = "Copy";
+		copyButton.onclick = function() {
+			self.copySecretDirectly(this);
+		};
+		container.appendChild(copyButton);
+	}
 };
 
 SecretWidget.prototype.hideSecretFallback = function(container) {
@@ -346,6 +378,15 @@ SecretWidget.prototype.hideSecretFallback = function(container) {
 	
 	container.innerHTML = '<button class="tc-btn-invisible tc-tiddlylink" title="Click to reveal, Ctrl+Click to copy">🔒 ' + 
 		$tw.utils.htmlEncode(this.secretName) + '</button>';
+	
+	// Add copy button if vault is unlocked
+	if($tw.secretsManager && $tw.secretsManager.isUnlocked()) {
+		container.innerHTML += ' <button class="tc-btn-invisible" style="color:#28a745;">Copy</button>';
+		container.lastChild.onclick = function() {
+			self.copySecretDirectly();
+		};
+	}
+	
 	container.firstChild.addEventListener("click", function(event) {
 		// Check for Ctrl+Click (Windows/Linux) or Cmd+Click (Mac)
 		if(event.ctrlKey || event.metaKey) {
@@ -379,7 +420,7 @@ SecretWidget.prototype.copyToClipboard = function(text, button) {
 	}
 };
 
-SecretWidget.prototype.copySecretDirectly = function() {
+SecretWidget.prototype.copySecretDirectly = function(button) {
 	var self = this;
 	
 	if(!$tw.secretsManager) {
@@ -400,7 +441,7 @@ SecretWidget.prototype.copySecretDirectly = function() {
 				if(data && data.password) {
 					$tw.secretsManager.unlock(data.password).then(function() {
 						// Successfully unlocked, now copy the secret
-						self.copySecretDirectly();
+						self.copySecretDirectly(button);
 					}).catch(function(error) {
 						alert("Invalid password");
 					});
@@ -420,6 +461,21 @@ SecretWidget.prototype.copySecretDirectly = function() {
 					title: "Secret Copied",
 					text: "Secret \"" + self.secretName + "\" copied to clipboard"
 				});
+				
+				// If button provided, show visual feedback
+				if(button && button.textContent) {
+					var originalText = button.textContent;
+					button.textContent = "Copied!";
+					if(button.classList) {
+						button.classList.add("copied");
+					}
+					setTimeout(function() {
+						button.textContent = originalText;
+						if(button.classList) {
+							button.classList.remove("copied");
+						}
+					}, 2000);
+				}
 			}).catch(function(err) {
 				self.fallbackCopy(secret);
 			});

@@ -366,6 +366,10 @@ VaultManagerWidget.prototype.renderManage = function() {
 	listSection.appendChild(listTitle);
 	
 	var secrets = $tw.secretsManager ? $tw.secretsManager.listSecrets() : [];
+	// Sort secrets alphabetically by name
+	secrets.sort(function(a, b) {
+		return a.toLowerCase().localeCompare(b.toLowerCase());
+	});
 	if(secrets.length > 0) {
 		var table = this.document.createElement("table");
 		table.className = "secrets-table";

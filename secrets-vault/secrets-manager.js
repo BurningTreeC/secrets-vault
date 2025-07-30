@@ -475,12 +475,14 @@ SecretsManager.prototype.changePassword = function(oldPassword, newPassword) {
 		return Promise.reject(new Error("New password too short"));
 	}
 	
+	// Variables to hold secrets and metadata across promise chain
+	var secrets = {};
+	var metadata = {};
+	
 	// First verify the old password
 	return this.unlock(oldPassword).then(function() {
 		// Get all secrets before changing the password
 		var vault = $tw.wiki.getTiddler("$:/secrets/vault");
-		var secrets = {};
-		var metadata = {};
 		
 		// Decrypt all secrets with old key
 		var decryptPromises = [];
