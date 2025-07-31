@@ -92,12 +92,10 @@ VaultManagerWidget.prototype.getStyles = function() {
 		".vault-title { font-size: 1.2em; font-weight: bold; margin-bottom: 0.5em; }",
 		".vault-status { padding: 0.5em; background: " + notificationBackgroundColor + "; border-radius: 4px; margin-bottom: 1em; }",
 		".vault-status.error { background: #ffebee; }",
-		".vault-status small { display: block; margin-top: 0.25em; opacity: 0.8; }",
 		".vault-form { display: flex; flex-direction: column; gap: 0.5em; max-width: 300px; }",
 		".password-wrapper { position: relative; display: flex; align-items: center; }",
 		".password-wrapper input { padding-right: 2.5em; }",
 		"input { padding: 0.5em; border: 1px solid " + tableBorderColor + "; border-radius: 3px; background: " + backgroundColor + "; color: " + foregroundColor + "; width: 100%; box-sizing: border-box; }",
-		"input:disabled { opacity: 0.5; cursor: not-allowed; }",
 		".toggle-password { position: absolute; right: 0.5em; background: none; border: none; cursor: pointer; padding: 0.25em; color: " + mutedForegroundColor + "; }",
 		".toggle-password:hover { color: " + foregroundColor + "; }",
 		"button { ",
@@ -110,19 +108,12 @@ VaultManagerWidget.prototype.getStyles = function() {
 		"}",
 		"button:hover { opacity: 0.8; }",
 		"button:active { opacity: 0.6; }",
-		"button:disabled { opacity: 0.5; cursor: not-allowed; }",
-		"button:disabled:hover { opacity: 0.5; }",
 		"button.danger { background: #dc3545; }",
 		"button.danger:hover { opacity: 0.8; }",
-		".secrets-table { width: 100%; border-collapse: collapse; margin-top: 1em; table-layout: fixed; }",
+		".secrets-table { width: 100%; border-collapse: collapse; margin-top: 1em; }",
 		".secrets-table th { text-align: left; padding: 0.5em; background: " + tableHeaderBackgroundColor + "; }",
-		".secrets-table th:first-child { width: 30%; }",
-		".secrets-table th:nth-child(2) { width: 25%; }",
-		".secrets-table th:nth-child(3) { width: 20%; }",
-		".secrets-table th:last-child { width: 25%; text-align: right; }",
-		".secrets-table td { padding: 0.5em; border-bottom: 1px solid " + tableBorderColor + "; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }",
-		".secrets-table td:last-child { text-align: right; }",
-		".table-buttons { display: inline-flex; gap: 0.25em; justify-content: flex-end; }",
+		".secrets-table td { padding: 0.5em; border-bottom: 1px solid " + tableBorderColor + "; }",
+		".table-buttons { display: flex; gap: 0.25em; }",
 		".view-btn { background: #17a2b8; padding: 0.25em 0.5em; font-size: 0.9em; color: white; }",
 		".copy-btn { background: #28a745; padding: 0.25em 0.5em; font-size: 0.9em; color: white; }",
 		".delete-btn { background: #dc3545; padding: 0.25em 0.5em; font-size: 0.9em; color: white; }"
@@ -281,39 +272,6 @@ VaultManagerWidget.prototype.renderUnlock = function() {
 	title.textContent = "Unlock Vault";
 	section.appendChild(title);
 	
-	// Check if currently locked out
-	if($tw.secretsManager && $tw.secretsManager.lockedUntil && Date.now() < $tw.secretsManager.lockedUntil) {
-		var remainingSeconds = Math.ceil(($tw.secretsManager.lockedUntil - Date.now()) / 1000);
-		var remainingMinutes = Math.ceil(remainingSeconds / 60);
-		var lockoutWarning = this.document.createElement("div");
-		lockoutWarning.className = "vault-status error";
-		lockoutWarning.innerHTML = "🔒 <strong>Vault is locked</strong><br>";
-		if(remainingSeconds < 60) {
-			lockoutWarning.innerHTML += "Too many failed attempts. Please wait " + remainingSeconds + " seconds before trying again.";
-		} else {
-			lockoutWarning.innerHTML += "Too many failed attempts. Please wait " + remainingMinutes + " minute" + (remainingMinutes > 1 ? "s" : "") + " before trying again.";
-		}
-		section.appendChild(lockoutWarning);
-		
-		// Auto-refresh the display every second during lockout
-		setTimeout(function() {
-			self.renderContent();
-		}, 1000);
-	}
-	// Show remaining attempts if any failed attempts but not locked out
-	else if($tw.secretsManager && $tw.secretsManager.attempts > 0) {
-		var remainingAttempts = 5 - $tw.secretsManager.attempts; // MAX_ATTEMPTS = 5
-		var attemptsWarning = this.document.createElement("div");
-		attemptsWarning.className = "vault-status error";
-		if(remainingAttempts > 0) {
-			attemptsWarning.textContent = "⚠️ " + remainingAttempts + " attempt" + (remainingAttempts > 1 ? "s" : "") + " remaining before lockout";
-			if(remainingAttempts <= 2) {
-				attemptsWarning.innerHTML += "<br><small>After lockout, you'll need to wait 5 minutes before trying again.</small>";
-			}
-		}
-		section.appendChild(attemptsWarning);
-	}
-	
 	var form = this.document.createElement("div");
 	form.className = "vault-form";
 	
@@ -324,15 +282,6 @@ VaultManagerWidget.prototype.renderUnlock = function() {
 	var button = this.document.createElement("button");
 	button.textContent = "Unlock";
 	
-	// Disable inputs during lockout
-	var isLockedOut = $tw.secretsManager && $tw.secretsManager.lockedUntil && Date.now() < $tw.secretsManager.lockedUntil;
-	if(isLockedOut) {
-		passwordInput.disabled = true;
-		button.disabled = true;
-		button.style.opacity = "0.5";
-		button.style.cursor = "not-allowed";
-	}
-	
 	var unlockSubmit = function() {
 		if($tw.secretsManager) {
 			$tw.secretsManager.unlock(passwordInput.value).then(function() {
@@ -340,24 +289,8 @@ VaultManagerWidget.prototype.renderUnlock = function() {
 				passwordInput.value = "";
 				self.renderContent();
 			}).catch(function(error) {
+				self.showStatus("Invalid password", true);
 				passwordInput.value = "";
-				// Check if it's a lockout message
-				if(error.message.includes("Too many attempts")) {
-					self.showStatus(error.message, true);
-				} else {
-					var remainingAttempts = 5 - $tw.secretsManager.attempts;
-					if(remainingAttempts > 0) {
-						var message = "Invalid password. " + remainingAttempts + " attempt" + (remainingAttempts > 1 ? "s" : "") + " remaining";
-						if(remainingAttempts <= 2) {
-							message += " before 5-minute lockout";
-						}
-						self.showStatus(message, true);
-					} else {
-						self.showStatus("Too many failed attempts. Please wait 5 minutes.", true);
-					}
-				}
-				// Re-render to update the attempts warning
-				self.renderContent();
 			});
 		} else {
 			self.showStatus("Secrets Manager not available", true);
@@ -385,6 +318,11 @@ VaultManagerWidget.prototype.renderManage = function() {
 	// Initialize search filter state if not already present
 	if(!this.searchFilter) {
 		this.searchFilter = "";
+	}
+	
+	// Clear shadow content while preserving style
+	while(this.shadow.lastChild && this.shadow.lastChild.tagName !== "STYLE") {
+		this.shadow.removeChild(this.shadow.lastChild);
 	}
 	
 	// Status section
@@ -482,7 +420,7 @@ VaultManagerWidget.prototype.renderManage = function() {
 				nameInput.value = "";
 				usernameInput.value = "";
 				valueInput.value = "";
-				self.updateSecretsList();
+				self.renderContent();
 			}).catch(function(error) {
 				self.showStatus("Error: " + error.message, true);
 			});
@@ -562,11 +500,148 @@ VaultManagerWidget.prototype.renderManage = function() {
 	
 	// Store references for later use
 	this.secretsContainer = secretsContainer;
+	this.listSection = listSection;
 	
 	this.shadow.appendChild(listSection);
 	
 	// Render the secrets list
 	this.updateSecretsList();
+		var table = this.document.createElement("table");
+		table.className = "secrets-table";
+		
+		var thead = this.document.createElement("thead");
+		var headerRow = this.document.createElement("tr");
+		var nameHeader = this.document.createElement("th");
+		nameHeader.textContent = "Name";
+		var usernameHeader = this.document.createElement("th");
+		usernameHeader.textContent = "Username";
+		var actionsHeader = this.document.createElement("th");
+		actionsHeader.textContent = "Actions";
+		headerRow.appendChild(nameHeader);
+		headerRow.appendChild(usernameHeader);
+		headerRow.appendChild(actionsHeader);
+		thead.appendChild(headerRow);
+		table.appendChild(thead);
+		
+		var tbody = this.document.createElement("tbody");
+		secrets.forEach(function(secret) {
+			var row = self.document.createElement("tr");
+			var nameCell = self.document.createElement("td");
+			nameCell.textContent = "🔐 " + secret;
+			nameCell.id = "secret-name-" + secret.replace(/\s/g, "-");
+			
+			// Username cell
+			var usernameCell = self.document.createElement("td");
+			var username = vault && vault.fields["username-" + secret] ? vault.fields["username-" + secret] : "";
+			usernameCell.textContent = username;
+			
+			var actionsCell = self.document.createElement("td");
+			
+			// Create button container
+			var buttonContainer = self.document.createElement("div");
+			buttonContainer.className = "table-buttons";
+			
+			// Create a closure to capture the secret value
+			(function(secretName) {
+				// View button
+				var viewBtn = self.document.createElement("button");
+				viewBtn.className = "view-btn";
+				viewBtn.textContent = "View";
+				viewBtn.onclick = function() {
+					$tw.secretsManager.getSecret(secretName).then(function(secretValue) {
+						var nameElement = self.shadow.getElementById("secret-name-" + secretName.replace(/\s/g, "-"));
+						if(nameElement) {
+							// Toggle between showing name and value
+							if(nameElement.dataset.showing === "value") {
+								nameElement.textContent = "🔐 " + secretName;
+								nameElement.dataset.showing = "name";
+								viewBtn.textContent = "View";
+							} else {
+								nameElement.textContent = secretValue;
+								nameElement.dataset.showing = "value";
+								viewBtn.textContent = "Hide";
+								// Auto-hide after 8 seconds
+								setTimeout(function() {
+									if(nameElement.dataset.showing === "value") {
+										nameElement.textContent = "🔐 " + secretName;
+										nameElement.dataset.showing = "name";
+										viewBtn.textContent = "View";
+									}
+								}, 8000);
+							}
+						}
+					}).catch(function(error) {
+						self.showStatus("Error: " + error.message, true);
+					});
+				};
+				
+				// Copy button
+				var copyBtn = self.document.createElement("button");
+				copyBtn.className = "copy-btn";
+				copyBtn.textContent = "Copy";
+				copyBtn.onclick = function() {
+					$tw.secretsManager.getSecret(secretName).then(function(secretValue) {
+						if(navigator.clipboard && navigator.clipboard.writeText) {
+							navigator.clipboard.writeText(secretValue).then(function() {
+								self.showStatus("Secret copied to clipboard!");
+								// Visual feedback
+								var originalText = copyBtn.textContent;
+								copyBtn.textContent = "Copied!";
+								setTimeout(function() {
+									copyBtn.textContent = originalText;
+								}, 2000);
+							}).catch(function() {
+								self.fallbackCopy(secretValue);
+							});
+						} else {
+							self.fallbackCopy(secretValue);
+						}
+					}).catch(function(error) {
+						self.showStatus("Error: " + error.message, true);
+					});
+				};
+				
+				// Delete button
+				var deleteBtn = self.document.createElement("button");
+				deleteBtn.className = "delete-btn";
+				deleteBtn.textContent = "Delete";
+				deleteBtn.onclick = function() {
+					if(confirm("Are you sure you want to delete this secret?")) {
+						if($tw.secretsManager) {
+							$tw.secretsManager.deleteSecret(secretName).then(function() {
+								self.showStatus("Secret deleted!");
+								self.renderContent();
+							}).catch(function(error) {
+								self.showStatus("Error: " + error.message, true);
+							});
+						}
+					}
+				};
+				
+				buttonContainer.appendChild(viewBtn);
+				buttonContainer.appendChild(copyBtn);
+				buttonContainer.appendChild(deleteBtn);
+			})(secret);
+			
+			actionsCell.appendChild(buttonContainer);
+			row.appendChild(nameCell);
+			row.appendChild(usernameCell);
+			row.appendChild(actionsCell);
+			tbody.appendChild(row);
+		});
+		table.appendChild(tbody);
+		listSection.appendChild(table);
+	} else {
+		var emptyMsg = this.document.createElement("p");
+		if(this.searchFilter) {
+			emptyMsg.textContent = "No secrets match your search.";
+		} else {
+			emptyMsg.textContent = "No secrets stored yet.";
+		}
+		listSection.appendChild(emptyMsg);
+	}
+	
+	this.shadow.appendChild(listSection);
 	
 	// Change password section
 	var changePasswordSection = this.document.createElement("div");
@@ -648,18 +723,11 @@ VaultManagerWidget.prototype.renderManage = function() {
 	
 	var autoLockTitle = this.document.createElement("div");
 	autoLockTitle.className = "vault-title";
-	autoLockTitle.textContent = "Security Settings";
+	autoLockTitle.textContent = "Auto-Lock Settings";
 	autoLockSection.appendChild(autoLockTitle);
 	
 	var autoLockForm = this.document.createElement("div");
 	autoLockForm.className = "vault-form";
-	
-	// Auto-lock timeout setting
-	var autoLockSubtitle = this.document.createElement("div");
-	autoLockSubtitle.style.fontWeight = "bold";
-	autoLockSubtitle.style.marginBottom = "0.5em";
-	autoLockSubtitle.textContent = "Auto-lock Timeout";
-	autoLockForm.appendChild(autoLockSubtitle);
 	
 	// Get current timeout value
 	var currentTimeout = parseInt($tw.wiki.getTiddlerText("$:/config/SecretsVault/AutoLockTimeout", "10"), 10);
@@ -710,270 +778,8 @@ VaultManagerWidget.prototype.renderManage = function() {
 	};
 	
 	autoLockForm.appendChild(saveTimeoutButton);
-	
-	// Auto-hide timeout setting for displayed secrets
-	var autoHideLabel = this.document.createElement("label");
-	autoHideLabel.style.marginTop = "1em";
-	autoHideLabel.textContent = "Auto-hide displayed secrets after (seconds, 0 to disable):";
-	autoLockForm.appendChild(autoHideLabel);
-	
-	// Get current auto-hide timeout value (convert from ms to seconds)
-	var currentAutoHideMs = parseInt($tw.wiki.getTiddlerText("$:/config/SecretsVault/AutoHideTimeout", "8000"), 10);
-	var currentAutoHideSeconds = Math.round(currentAutoHideMs / 1000);
-	
-	var autoHideInput = this.document.createElement("input");
-	autoHideInput.type = "number";
-	autoHideInput.min = "0";
-	autoHideInput.max = "300"; // Max 5 minutes
-	autoHideInput.value = currentAutoHideSeconds;
-	autoHideInput.placeholder = "Seconds (0 to disable)";
-	// Handle paste events
-	autoHideInput.addEventListener('paste', function(e) {
-		e.stopPropagation();
-	}, true);
-	autoHideInput.addEventListener('cut', function(e) {
-		e.stopPropagation();
-	}, true);
-	autoHideInput.addEventListener('copy', function(e) {
-		e.stopPropagation();
-	}, true);
-	autoLockForm.appendChild(autoHideInput);
-	
-	var saveAutoHideButton = this.document.createElement("button");
-	saveAutoHideButton.textContent = "Save Auto-Hide Settings";
-	saveAutoHideButton.onclick = function() {
-		var newAutoHideSeconds = parseInt(autoHideInput.value, 10);
-		if(isNaN(newAutoHideSeconds) || newAutoHideSeconds < 0) {
-			self.showStatus("Invalid timeout value", true);
-			return;
-		}
-		
-		// Convert seconds to milliseconds and save
-		var newAutoHideMs = newAutoHideSeconds * 1000;
-		$tw.wiki.addTiddler({
-			title: "$:/config/SecretsVault/AutoHideTimeout",
-			text: newAutoHideMs.toString()
-		});
-		
-		self.showStatus("Auto-hide timeout updated to " + (newAutoHideSeconds === 0 ? "disabled" : newAutoHideSeconds + " seconds"));
-	};
-	
-	autoLockForm.appendChild(saveAutoHideButton);
 	autoLockSection.appendChild(autoLockForm);
 	this.shadow.appendChild(autoLockSection);
-};
-
-VaultManagerWidget.prototype.updateSecretsList = function() {
-	var self = this;
-	
-	// Clear the container
-	if(this.secretsContainer) {
-		this.secretsContainer.innerHTML = "";
-	}
-	
-	var secrets = $tw.secretsManager ? $tw.secretsManager.listSecrets() : [];
-	var vault = $tw.wiki.getTiddler("$:/secrets/vault");
-	
-	// Filter secrets based on search input
-	if(this.searchFilter) {
-		var filter = this.searchFilter.toLowerCase();
-		secrets = secrets.filter(function(secret) {
-			var secretNameMatch = secret.toLowerCase().includes(filter);
-			var username = vault && vault.fields["username-" + secret] ? vault.fields["username-" + secret] : "";
-			var usernameMatch = username.toLowerCase().includes(filter);
-			return secretNameMatch || usernameMatch;
-		});
-	}
-	
-	// Sort secrets alphabetically by name
-	secrets.sort(function(a, b) {
-		return a.toLowerCase().localeCompare(b.toLowerCase());
-	});
-	
-	if(secrets.length > 0) {
-		var table = this.document.createElement("table");
-		table.className = "secrets-table";
-		
-		var thead = this.document.createElement("thead");
-		var headerRow = this.document.createElement("tr");
-		var nameHeader = this.document.createElement("th");
-		nameHeader.textContent = "Name";
-		var usernameHeader = this.document.createElement("th");
-		usernameHeader.textContent = "Username";
-		var createdHeader = this.document.createElement("th");
-		createdHeader.textContent = "Created";
-		var actionsHeader = this.document.createElement("th");
-		actionsHeader.textContent = "Actions";
-		headerRow.appendChild(nameHeader);
-		headerRow.appendChild(usernameHeader);
-		headerRow.appendChild(createdHeader);
-		headerRow.appendChild(actionsHeader);
-		thead.appendChild(headerRow);
-		table.appendChild(thead);
-		
-		var tbody = this.document.createElement("tbody");
-		secrets.forEach(function(secret) {
-			var row = self.document.createElement("tr");
-			var nameCell = self.document.createElement("td");
-			nameCell.textContent = "🔐 " + secret;
-			nameCell.id = "secret-name-" + secret.replace(/\s/g, "-");
-			
-			// Username cell
-			var usernameCell = self.document.createElement("td");
-			var username = vault && vault.fields["username-" + secret] ? vault.fields["username-" + secret] : "";
-			usernameCell.textContent = username;
-			
-			// Created cell
-			var createdCell = self.document.createElement("td");
-			var metaField = vault && vault.fields["meta-" + secret];
-			if(metaField) {
-				try {
-					var meta = JSON.parse(metaField);
-					var created = new Date(meta.created);
-					// Format as relative time or date
-					var now = new Date();
-					var diff = now - created;
-					var days = Math.floor(diff / (1000 * 60 * 60 * 24));
-					
-					if(days === 0) {
-						// Today - show time
-						var hours = Math.floor(diff / (1000 * 60 * 60));
-						if(hours === 0) {
-							var minutes = Math.floor(diff / (1000 * 60));
-							if(minutes === 0) {
-								createdCell.textContent = "Just now";
-							} else {
-								createdCell.textContent = minutes + " min ago";
-							}
-						} else {
-							createdCell.textContent = hours + " hours ago";
-						}
-					} else if(days === 1) {
-						createdCell.textContent = "Yesterday";
-					} else if(days < 7) {
-						createdCell.textContent = days + " days ago";
-					} else {
-						// Show actual date for older items
-						createdCell.textContent = created.toLocaleDateString();
-					}
-					// Add title attribute with full date/time
-					createdCell.title = created.toLocaleString();
-				} catch(e) {
-					createdCell.textContent = "-";
-				}
-			} else {
-				createdCell.textContent = "-";
-			}
-			
-			var actionsCell = self.document.createElement("td");
-			
-			// Create button container
-			var buttonContainer = self.document.createElement("div");
-			buttonContainer.className = "table-buttons";
-			
-			// Create a closure to capture the secret value
-			(function(secretName) {
-				// View button
-				var viewBtn = self.document.createElement("button");
-				viewBtn.className = "view-btn";
-				viewBtn.textContent = "View";
-				viewBtn.onclick = function() {
-					$tw.secretsManager.getSecret(secretName).then(function(secretValue) {
-						var nameElement = self.shadow.getElementById("secret-name-" + secretName.replace(/\s/g, "-"));
-						if(nameElement) {
-							// Toggle between showing name and value
-							if(nameElement.dataset.showing === "value") {
-								nameElement.textContent = "🔐 " + secretName;
-								nameElement.dataset.showing = "name";
-								viewBtn.textContent = "View";
-							} else {
-								nameElement.textContent = secretValue;
-								nameElement.dataset.showing = "value";
-								viewBtn.textContent = "Hide";
-								// Auto-hide after configured timeout
-								var autoHideTimeout = parseInt($tw.wiki.getTiddlerText("$:/config/SecretsVault/AutoHideTimeout", "8000"), 10);
-								if(autoHideTimeout > 0) {
-									setTimeout(function() {
-										if(nameElement.dataset.showing === "value") {
-											nameElement.textContent = "🔐 " + secretName;
-											nameElement.dataset.showing = "name";
-											viewBtn.textContent = "View";
-										}
-									}, autoHideTimeout);
-								}
-							}
-						}
-					}).catch(function(error) {
-						self.showStatus("Error: " + error.message, true);
-					});
-				};
-				
-				// Copy button
-				var copyBtn = self.document.createElement("button");
-				copyBtn.className = "copy-btn";
-				copyBtn.textContent = "Copy";
-				copyBtn.onclick = function() {
-					$tw.secretsManager.getSecret(secretName).then(function(secretValue) {
-						if(navigator.clipboard && navigator.clipboard.writeText) {
-							navigator.clipboard.writeText(secretValue).then(function() {
-								self.showStatus("Secret copied to clipboard!");
-								// Visual feedback
-								var originalText = copyBtn.textContent;
-								copyBtn.textContent = "Copied!";
-								setTimeout(function() {
-									copyBtn.textContent = originalText;
-								}, 2000);
-							}).catch(function() {
-								self.fallbackCopy(secretValue);
-							});
-						} else {
-							self.fallbackCopy(secretValue);
-						}
-					}).catch(function(error) {
-						self.showStatus("Error: " + error.message, true);
-					});
-				};
-				
-				// Delete button
-				var deleteBtn = self.document.createElement("button");
-				deleteBtn.className = "delete-btn";
-				deleteBtn.textContent = "Delete";
-				deleteBtn.onclick = function() {
-					if(confirm("Are you sure you want to delete this secret?")) {
-						if($tw.secretsManager) {
-							$tw.secretsManager.deleteSecret(secretName).then(function() {
-								self.showStatus("Secret deleted!");
-								self.updateSecretsList();
-							}).catch(function(error) {
-								self.showStatus("Error: " + error.message, true);
-							});
-						}
-					}
-				};
-				
-				buttonContainer.appendChild(viewBtn);
-				buttonContainer.appendChild(copyBtn);
-				buttonContainer.appendChild(deleteBtn);
-			})(secret);
-			
-			actionsCell.appendChild(buttonContainer);
-			row.appendChild(nameCell);
-			row.appendChild(usernameCell);
-			row.appendChild(createdCell);
-			row.appendChild(actionsCell);
-			tbody.appendChild(row);
-		});
-		table.appendChild(tbody);
-		this.secretsContainer.appendChild(table);
-	} else {
-		var emptyMsg = this.document.createElement("p");
-		if(this.searchFilter) {
-			emptyMsg.textContent = "No secrets match your search.";
-		} else {
-			emptyMsg.textContent = "No secrets stored yet.";
-		}
-		this.secretsContainer.appendChild(emptyMsg);
-	}
 };
 
 VaultManagerWidget.prototype.showStatus = function(message, isError) {
