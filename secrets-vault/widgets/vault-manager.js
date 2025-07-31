@@ -83,8 +83,8 @@ VaultManagerWidget.prototype.getStyles = function() {
 	var tableBorderColor = paletteData["table-border"] || "#ddd";
 	var tableHeaderBackgroundColor = paletteData["table-header-background"] || "#f5f5f5";
 	var notificationBackgroundColor = paletteData["notification-background"] || "#fff3cd";
-	var tagBackgroundColor = paletteData["tag-background"] || primaryColor;
-	var tagForegroundColor = paletteData["tag-foreground"] || (this.isColorDark(tagBackgroundColor) ? "#ffffff" : "#000000");
+	var buttonBackgroundColor = paletteData["button-background"] || primaryColor;
+	var buttonForegroundColor = paletteData["button-foreground"] || (this.isColorDark(buttonBackgroundColor) ? "#ffffff" : "#000000");
 	
 	return [
 		":host { display: block; padding: 1em; background: " + backgroundColor + "; color: " + foregroundColor + "; }",
@@ -102,8 +102,8 @@ VaultManagerWidget.prototype.getStyles = function() {
 		".toggle-password:hover { color: " + foregroundColor + "; }",
 		"button { ",
 		"  padding: 0.5em 1em;",
-		"  background: " + tagBackgroundColor + ";",
-		"  color: " + tagForegroundColor + ";",
+		"  background: " + buttonBackgroundColor + ";",
+		"  color: " + buttonForegroundColor + ";",
 		"  border: none;",
 		"  border-radius: 3px;",
 		"  cursor: pointer;",

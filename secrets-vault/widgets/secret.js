@@ -61,8 +61,8 @@ SecretWidget.prototype.render = function(parent,nextSibling) {
 		
 		// Extract colors with fallbacks
 		var primaryColor = paletteData.primary || "#4a90e2";
-		var tagBackgroundColor = paletteData["tag-background"] || primaryColor;
-		var tagForegroundColor = paletteData["tag-foreground"] || (this.isColorDark(tagBackgroundColor) ? "#ffffff" : "#000000");
+		var buttonBackgroundColor = paletteData["button-background"] || primaryColor;
+		var buttonForegroundColor = paletteData["button-foreground"] || (this.isColorDark(buttonBackgroundColor) ? "#ffffff" : "#000000");
 		var codeBackgroundColor = paletteData["code-background"] || "#f0f0f0";
 		var foregroundColor = paletteData.foreground || "#333333";
 		var mutedForegroundColor = paletteData["muted-foreground"] || "#888888";
@@ -73,8 +73,8 @@ SecretWidget.prototype.render = function(parent,nextSibling) {
 			":host { display: inline-block; }",
 			".secret-container { display: inline-flex; align-items: center; gap: 4px; }",
 			".secret-button { ",
-			"  background: " + tagBackgroundColor + ";",
-			"  color: " + tagForegroundColor + ";",
+			"  background: " + buttonBackgroundColor + ";",
+			"  color: " + buttonForegroundColor + ";",
 			"  border: none;",
 			"  padding: 2px 8px;",
 			"  border-radius: 3px;",
