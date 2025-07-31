@@ -133,7 +133,7 @@ Configure automatic vault locking after inactivity:
 
 ### Widgets
 - `<$vault-manager/>` - Full vault management UI
-- `<secret name="..."/>` - Display individual secret
+- `<$secret name="..."/>` - Display individual secret
 
 ## Development
 
