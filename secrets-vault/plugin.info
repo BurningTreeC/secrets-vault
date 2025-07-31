@@ -3,7 +3,7 @@
 	"name": "Secrets Vault",
 	"description": "Secure secrets vault using Web Crypto API",
 	"author": "Simon Huber",
-	"version": "0.0.4",
+	"version": "0.0.5",
 	"core-version": ">=5.3.0",
 	"source": "https://github.com/BurningTreeC/secrets-vault",
 	"plugin-type": "plugin",

@@ -130,6 +130,21 @@ VaultManagerWidget.prototype.createPasswordInput = function(placeholder) {
 	input.type = "password";
 	input.placeholder = placeholder;
 	
+	// Handle paste events to ensure they work in Shadow DOM
+	input.addEventListener('paste', function(e) {
+		e.stopPropagation();
+		// Let the default paste behavior happen
+	}, true);
+	
+	// Also handle cut and copy for consistency
+	input.addEventListener('cut', function(e) {
+		e.stopPropagation();
+	}, true);
+	
+	input.addEventListener('copy', function(e) {
+		e.stopPropagation();
+	}, true);
+	
 	var toggleButton = this.document.createElement("button");
 	toggleButton.className = "toggle-password";
 	toggleButton.type = "button";
@@ -343,11 +358,31 @@ VaultManagerWidget.prototype.renderManage = function() {
 	var nameInput = this.document.createElement("input");
 	nameInput.type = "text";
 	nameInput.placeholder = "Secret name";
+	// Handle paste events
+	nameInput.addEventListener('paste', function(e) {
+		e.stopPropagation();
+	}, true);
+	nameInput.addEventListener('cut', function(e) {
+		e.stopPropagation();
+	}, true);
+	nameInput.addEventListener('copy', function(e) {
+		e.stopPropagation();
+	}, true);
 	addForm.appendChild(nameInput);
 	
 	var usernameInput = this.document.createElement("input");
 	usernameInput.type = "text";
 	usernameInput.placeholder = "Username (optional)";
+	// Handle paste events
+	usernameInput.addEventListener('paste', function(e) {
+		e.stopPropagation();
+	}, true);
+	usernameInput.addEventListener('cut', function(e) {
+		e.stopPropagation();
+	}, true);
+	usernameInput.addEventListener('copy', function(e) {
+		e.stopPropagation();
+	}, true);
 	addForm.appendChild(usernameInput);
 	
 	var valueField = this.createPasswordInput("Secret value");
@@ -656,6 +691,16 @@ VaultManagerWidget.prototype.renderManage = function() {
 	timeoutInput.max = "1440"; // Max 24 hours
 	timeoutInput.value = currentTimeout;
 	timeoutInput.placeholder = "Minutes (0 to disable)";
+	// Handle paste events
+	timeoutInput.addEventListener('paste', function(e) {
+		e.stopPropagation();
+	}, true);
+	timeoutInput.addEventListener('cut', function(e) {
+		e.stopPropagation();
+	}, true);
+	timeoutInput.addEventListener('copy', function(e) {
+		e.stopPropagation();
+	}, true);
 	autoLockForm.appendChild(timeoutInput);
 	
 	var saveTimeoutButton = this.document.createElement("button");
