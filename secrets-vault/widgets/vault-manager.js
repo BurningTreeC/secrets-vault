@@ -345,6 +345,11 @@ VaultManagerWidget.prototype.renderManage = function() {
 	nameInput.placeholder = "Secret name";
 	addForm.appendChild(nameInput);
 	
+	var usernameInput = this.document.createElement("input");
+	usernameInput.type = "text";
+	usernameInput.placeholder = "Username (optional)";
+	addForm.appendChild(usernameInput);
+	
 	var valueField = this.createPasswordInput("Secret value");
 	var valueInput = valueField.input;
 	addForm.appendChild(valueField.wrapper);
@@ -359,8 +364,16 @@ VaultManagerWidget.prototype.renderManage = function() {
 		}
 		if($tw.secretsManager) {
 			$tw.secretsManager.addSecret(nameInput.value, valueInput.value).then(function() {
+				// Store username if provided
+				if(usernameInput.value) {
+					var vault = $tw.wiki.getTiddler("$:/secrets/vault") || {};
+					var fields = Object.assign({}, vault.fields);
+					fields["username-" + nameInput.value] = usernameInput.value;
+					$tw.wiki.addTiddler(new $tw.Tiddler(vault, fields));
+				}
 				self.showStatus("Secret added successfully!");
 				nameInput.value = "";
+				usernameInput.value = "";
 				valueInput.value = "";
 				self.renderContent();
 			}).catch(function(error) {
@@ -375,6 +388,11 @@ VaultManagerWidget.prototype.renderManage = function() {
 	
 	// Handle Enter key
 	nameInput.onkeypress = function(e) {
+		if(e.key === "Enter") {
+			addSecretSubmit();
+		}
+	};
+	usernameInput.onkeypress = function(e) {
 		if(e.key === "Enter") {
 			addSecretSubmit();
 		}
@@ -412,9 +430,12 @@ VaultManagerWidget.prototype.renderManage = function() {
 		var headerRow = this.document.createElement("tr");
 		var nameHeader = this.document.createElement("th");
 		nameHeader.textContent = "Name";
+		var usernameHeader = this.document.createElement("th");
+		usernameHeader.textContent = "Username";
 		var actionsHeader = this.document.createElement("th");
 		actionsHeader.textContent = "Actions";
 		headerRow.appendChild(nameHeader);
+		headerRow.appendChild(usernameHeader);
 		headerRow.appendChild(actionsHeader);
 		thead.appendChild(headerRow);
 		table.appendChild(thead);
@@ -425,6 +446,13 @@ VaultManagerWidget.prototype.renderManage = function() {
 			var nameCell = self.document.createElement("td");
 			nameCell.textContent = "🔐 " + secret;
 			nameCell.id = "secret-name-" + secret.replace(/\s/g, "-");
+			
+			// Username cell
+			var usernameCell = self.document.createElement("td");
+			var vault = $tw.wiki.getTiddler("$:/secrets/vault");
+			var username = vault && vault.fields["username-" + secret] ? vault.fields["username-" + secret] : "";
+			usernameCell.textContent = username;
+			
 			var actionsCell = self.document.createElement("td");
 			
 			// Create button container
@@ -515,6 +543,7 @@ VaultManagerWidget.prototype.renderManage = function() {
 			
 			actionsCell.appendChild(buttonContainer);
 			row.appendChild(nameCell);
+			row.appendChild(usernameCell);
 			row.appendChild(actionsCell);
 			tbody.appendChild(row);
 		});

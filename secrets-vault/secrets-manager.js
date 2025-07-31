@@ -519,6 +519,7 @@ SecretsManager.prototype.deleteSecret = function(name) {
 	var fields = Object.assign({}, vault.fields);
 	delete fields["secret-" + name];
 	delete fields["meta-" + name];
+	delete fields["username-" + name];
 	// Create a new tiddler with only the remaining fields
 	$tw.wiki.addTiddler(new $tw.Tiddler(fields));
 	
@@ -560,6 +561,8 @@ SecretsManager.prototype.changePassword = function(oldPassword, newPassword) {
 					})
 				);
 			} else if(name.indexOf("meta-") === 0) {
+				metadata[name] = value;
+			} else if(name.indexOf("username-") === 0) {
 				metadata[name] = value;
 			}
 		});

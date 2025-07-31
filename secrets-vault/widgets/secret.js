@@ -112,7 +112,16 @@ SecretWidget.prototype.render = function(parent,nextSibling) {
 		// Create reveal button
 		var revealButton = this.document.createElement("button");
 		revealButton.className = "secret-button";
-		revealButton.textContent = "🔒 " + this.secretName;
+		
+		// Get username if available
+		var vault = $tw.wiki.getTiddler("$:/secrets/vault");
+		var username = vault && vault.fields["username-" + this.secretName] ? vault.fields["username-" + this.secretName] : "";
+		var buttonText = "🔒 " + this.secretName;
+		if(username) {
+			buttonText += " (" + username + ")";
+		}
+		
+		revealButton.textContent = buttonText;
 		revealButton.title = "Click to reveal, Ctrl+Click to copy";
 		revealButton.addEventListener("click", function(event) {
 			// Check for Ctrl+Click (Windows/Linux) or Cmd+Click (Mac)
@@ -142,8 +151,16 @@ SecretWidget.prototype.render = function(parent,nextSibling) {
 		shadow.appendChild(secretContainer);
 	} else {
 		// Fallback for browsers without Shadow DOM
-		container.innerHTML = '<button class="tc-btn-invisible tc-tiddlylink">🔒 ' + 
-			$tw.utils.htmlEncode(this.secretName) + '</button>';
+		// Get username if available
+		var vault = $tw.wiki.getTiddler("$:/secrets/vault");
+		var username = vault && vault.fields["username-" + this.secretName] ? vault.fields["username-" + this.secretName] : "";
+		var buttonText = "🔒 " + this.secretName;
+		if(username) {
+			buttonText += " (" + username + ")";
+		}
+		
+		container.innerHTML = '<button class="tc-btn-invisible tc-tiddlylink">' + 
+			$tw.utils.htmlEncode(buttonText) + '</button>';
 		
 		// Add copy button if vault is unlocked
 		if($tw.secretsManager && $tw.secretsManager.isUnlocked()) {
@@ -210,7 +227,16 @@ SecretWidget.prototype.revealSecret = function(shadow, container) {
 		// Create the same button as when hidden
 		var hideButton = self.document.createElement("button");
 		hideButton.className = "secret-button";
-		hideButton.textContent = "🔒 " + self.secretName;
+		
+		// Get username if available
+		var vault = $tw.wiki.getTiddler("$:/secrets/vault");
+		var username = vault && vault.fields["username-" + self.secretName] ? vault.fields["username-" + self.secretName] : "";
+		var buttonText = "🔒 " + self.secretName;
+		if(username) {
+			buttonText += " (" + username + ")";
+		}
+		
+		hideButton.textContent = buttonText;
 		hideButton.title = "Click to hide, Ctrl+Click to copy";
 		
 		// Create revealed secret span
@@ -292,8 +318,16 @@ SecretWidget.prototype.revealSecretFallback = function(container) {
 		var paletteData = palette ? $tw.wiki.getTiddlerDataCached(palette) : {};
 		var codeBackgroundColor = paletteData["code-background"] || "#f0f0f0";
 		
-		container.innerHTML = '<button class="tc-btn-invisible tc-tiddlylink" title="Click to hide, Ctrl+Click to copy">🔒 ' + 
-			$tw.utils.htmlEncode(self.secretName) + '</button>' +
+		// Get username if available
+		var vault = $tw.wiki.getTiddler("$:/secrets/vault");
+		var username = vault && vault.fields["username-" + self.secretName] ? vault.fields["username-" + self.secretName] : "";
+		var buttonText = "🔒 " + self.secretName;
+		if(username) {
+			buttonText += " (" + username + ")";
+		}
+		
+		container.innerHTML = '<button class="tc-btn-invisible tc-tiddlylink" title="Click to hide, Ctrl+Click to copy">' + 
+			$tw.utils.htmlEncode(buttonText) + '</button>' +
 			'<span style="background:' + codeBackgroundColor + ';padding:2px 6px;border-radius:3px;font-family:monospace;margin-left:4px;">' +
 			$tw.utils.htmlEncode(secret) + '</span> ' +
 			'<button class="tc-btn-invisible" style="color:#28a745;">Copy</button>';
@@ -339,7 +373,16 @@ SecretWidget.prototype.hideSecret = function(shadow, container) {
 	
 	var revealButton = this.document.createElement("button");
 	revealButton.className = "secret-button";
-	revealButton.textContent = "🔒 " + this.secretName;
+	
+	// Get username if available
+	var vault = $tw.wiki.getTiddler("$:/secrets/vault");
+	var username = vault && vault.fields["username-" + this.secretName] ? vault.fields["username-" + this.secretName] : "";
+	var buttonText = "🔒 " + this.secretName;
+	if(username) {
+		buttonText += " (" + username + ")";
+	}
+	
+	revealButton.textContent = buttonText;
 	revealButton.title = "Click to reveal, Ctrl+Click to copy";
 	revealButton.addEventListener("click", function(event) {
 		// Check for Ctrl+Click (Windows/Linux) or Cmd+Click (Mac)
@@ -376,8 +419,16 @@ SecretWidget.prototype.hideSecretFallback = function(container) {
 		this.autoHideTimeout = null;
 	}
 	
-	container.innerHTML = '<button class="tc-btn-invisible tc-tiddlylink" title="Click to reveal, Ctrl+Click to copy">🔒 ' + 
-		$tw.utils.htmlEncode(this.secretName) + '</button>';
+	// Get username if available
+	var vault = $tw.wiki.getTiddler("$:/secrets/vault");
+	var username = vault && vault.fields["username-" + this.secretName] ? vault.fields["username-" + this.secretName] : "";
+	var buttonText = "🔒 " + this.secretName;
+	if(username) {
+		buttonText += " (" + username + ")";
+	}
+	
+	container.innerHTML = '<button class="tc-btn-invisible tc-tiddlylink" title="Click to reveal, Ctrl+Click to copy">' + 
+		$tw.utils.htmlEncode(buttonText) + '</button>';
 	
 	// Add copy button if vault is unlocked
 	if($tw.secretsManager && $tw.secretsManager.isUnlocked()) {
