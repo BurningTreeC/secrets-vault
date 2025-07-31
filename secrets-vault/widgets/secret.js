@@ -165,22 +165,26 @@ SecretWidget.prototype.render = function(parent,nextSibling) {
 		// Add copy button if vault is unlocked
 		if($tw.secretsManager && $tw.secretsManager.isUnlocked()) {
 			container.innerHTML += ' <button class="tc-btn-invisible" style="color:#28a745;">Copy</button>';
-			container.lastChild.onclick = function() {
-				self.copySecretDirectly(this);
-			};
+			if(container.lastChild) {
+				container.lastChild.onclick = function() {
+					self.copySecretDirectly(this);
+				};
+			}
 		}
 		
-		container.firstChild.addEventListener("click", function(event) {
-			// Check for Ctrl+Click (Windows/Linux) or Cmd+Click (Mac)
-			if(event.ctrlKey || event.metaKey) {
-				event.preventDefault();
-				event.stopPropagation();
-				event.stopImmediatePropagation();
-				self.copySecretDirectly();
-				return false;
-			}
-			self.revealSecretFallback(container);
-		}, false);
+		if(container.firstChild) {
+			container.firstChild.addEventListener("click", function(event) {
+				// Check for Ctrl+Click (Windows/Linux) or Cmd+Click (Mac)
+				if(event.ctrlKey || event.metaKey) {
+					event.preventDefault();
+					event.stopPropagation();
+					event.stopImmediatePropagation();
+					self.copySecretDirectly();
+					return false;
+				}
+				self.revealSecretFallback(container);
+			}, false);
+		}
 	}
 	
 	parent.insertBefore(container,nextSibling);
@@ -333,22 +337,26 @@ SecretWidget.prototype.revealSecretFallback = function(container) {
 			'<button class="tc-btn-invisible" style="color:#28a745;">Copy</button>';
 		
 		// Make button clickable to hide
-		container.firstChild.addEventListener("click", function(event) {
-			// Check for Ctrl+Click (Windows/Linux) or Cmd+Click (Mac)
-			if(event.ctrlKey || event.metaKey) {
-				event.preventDefault();
-				event.stopPropagation();
-				event.stopImmediatePropagation();
-				self.copyToClipboard(secret, container.lastChild);
-				return false;
-			}
-			self.hideSecretFallback(container);
-		}, false);
+		if(container.firstChild) {
+			container.firstChild.addEventListener("click", function(event) {
+				// Check for Ctrl+Click (Windows/Linux) or Cmd+Click (Mac)
+				if(event.ctrlKey || event.metaKey) {
+					event.preventDefault();
+					event.stopPropagation();
+					event.stopImmediatePropagation();
+					self.copyToClipboard(secret, container.lastChild || null);
+					return false;
+				}
+				self.hideSecretFallback(container);
+			}, false);
+		}
 		
 		// Copy button
-		container.lastChild.onclick = function() {
-			self.copyToClipboard(secret, this);
-		};
+		if(container.lastChild) {
+			container.lastChild.onclick = function() {
+				self.copyToClipboard(secret, this);
+			};
+		}
 		
 		// Auto-hide after configured timeout (default 8 seconds)
 		var timeout = parseInt($tw.wiki.getTiddlerText("$:/config/SecretsVault/AutoHideTimeout", "8000"), 10);
@@ -433,22 +441,26 @@ SecretWidget.prototype.hideSecretFallback = function(container) {
 	// Add copy button if vault is unlocked
 	if($tw.secretsManager && $tw.secretsManager.isUnlocked()) {
 		container.innerHTML += ' <button class="tc-btn-invisible" style="color:#28a745;">Copy</button>';
-		container.lastChild.onclick = function() {
-			self.copySecretDirectly();
-		};
+		if(container.lastChild) {
+			container.lastChild.onclick = function() {
+				self.copySecretDirectly();
+			};
+		}
 	}
 	
-	container.firstChild.addEventListener("click", function(event) {
-		// Check for Ctrl+Click (Windows/Linux) or Cmd+Click (Mac)
-		if(event.ctrlKey || event.metaKey) {
-			event.preventDefault();
-			event.stopPropagation();
-			event.stopImmediatePropagation();
-			self.copySecretDirectly();
-			return false;
-		}
-		self.revealSecretFallback(container);
-	}, false);
+	if(container.firstChild) {
+		container.firstChild.addEventListener("click", function(event) {
+			// Check for Ctrl+Click (Windows/Linux) or Cmd+Click (Mac)
+			if(event.ctrlKey || event.metaKey) {
+				event.preventDefault();
+				event.stopPropagation();
+				event.stopImmediatePropagation();
+				self.copySecretDirectly();
+				return false;
+			}
+			self.revealSecretFallback(container);
+		}, false);
+	}
 };
 
 SecretWidget.prototype.copyToClipboard = function(text, button) {
