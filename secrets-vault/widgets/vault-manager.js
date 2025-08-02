@@ -470,14 +470,8 @@ VaultManagerWidget.prototype.renderManage = function() {
 			return;
 		}
 		if($tw.secretsManager) {
-			$tw.secretsManager.addSecret(nameInput.value, valueInput.value).then(function() {
-				// Store username if provided
-				if(usernameInput.value) {
-					var vault = $tw.wiki.getTiddler("$:/secrets/vault") || {};
-					var fields = Object.assign({}, vault.fields);
-					fields["username-" + nameInput.value] = usernameInput.value;
-					$tw.wiki.addTiddler(new $tw.Tiddler(vault, fields));
-				}
+			// Pass username to addSecret method which now handles encryption
+			$tw.secretsManager.addSecret(nameInput.value, valueInput.value, usernameInput.value).then(function() {
 				self.showStatus("Secret added successfully!");
 				nameInput.value = "";
 				usernameInput.value = "";
@@ -687,7 +681,7 @@ VaultManagerWidget.prototype.renderManage = function() {
 	autoLockForm.appendChild(timeoutInput);
 	
 	var saveTimeoutButton = this.document.createElement("button");
-	saveTimeoutButton.textContent = "Save Settings";
+	saveTimeoutButton.textContent = "Save Auto-lock Settings";
 	saveTimeoutButton.onclick = function() {
 		var newTimeout = parseInt(timeoutInput.value, 10);
 		if(isNaN(newTimeout) || newTimeout < 0) {
@@ -766,6 +760,11 @@ VaultManagerWidget.prototype.renderManage = function() {
 VaultManagerWidget.prototype.updateSecretsList = function() {
 	var self = this;
 	
+	// Cancel any pending update
+	if(this.updateSecretsListPromise) {
+		this.updateSecretsListCancelled = true;
+	}
+	
 	// Clear the container
 	if(this.secretsContainer) {
 		this.secretsContainer.innerHTML = "";
@@ -774,15 +773,55 @@ VaultManagerWidget.prototype.updateSecretsList = function() {
 	var secrets = $tw.secretsManager ? $tw.secretsManager.listSecrets() : [];
 	var vault = $tw.wiki.getTiddler("$:/secrets/vault");
 	
-	// Filter secrets based on search input
-	if(this.searchFilter) {
-		var filter = this.searchFilter.toLowerCase();
-		secrets = secrets.filter(function(secret) {
-			var secretNameMatch = secret.toLowerCase().includes(filter);
-			var username = vault && vault.fields["username-" + secret] ? vault.fields["username-" + secret] : "";
-			var usernameMatch = username.toLowerCase().includes(filter);
-			return secretNameMatch || usernameMatch;
+	// Create a map to store decrypted usernames
+	var usernamePromises = {};
+	var usernameCache = {};
+	
+	// Start decrypting all usernames
+	secrets.forEach(function(secret) {
+		usernamePromises[secret] = $tw.secretsManager.getUsername(secret).then(function(username) {
+			usernameCache[secret] = username;
+			return username;
+		}).catch(function() {
+			usernameCache[secret] = "";
+			return "";
 		});
+	});
+	
+	// Mark this update as not cancelled
+	this.updateSecretsListCancelled = false;
+	
+	// Wait for all usernames to be decrypted before filtering
+	this.updateSecretsListPromise = Promise.all(Object.values(usernamePromises)).then(function() {
+		// Check if this update was cancelled
+		if(self.updateSecretsListCancelled) {
+			return;
+		}
+		
+		// Filter secrets based on search input
+		if(self.searchFilter) {
+			var filter = self.searchFilter.toLowerCase();
+			secrets = secrets.filter(function(secret) {
+				var secretNameMatch = secret.toLowerCase().includes(filter);
+				var username = usernameCache[secret] || "";
+				var usernameMatch = username.toLowerCase().includes(filter);
+				return secretNameMatch || usernameMatch;
+			});
+		}
+		
+		// Continue with rendering the filtered list
+		self.renderSecretsList(secrets, usernameCache);
+		self.updateSecretsListPromise = null;
+	});
+};
+
+VaultManagerWidget.prototype.renderSecretsList = function(secrets, usernameCache) {
+	var self = this;
+	var vault = $tw.wiki.getTiddler("$:/secrets/vault");
+	
+	// Clear the container again to prevent duplication
+	if(this.secretsContainer) {
+		this.secretsContainer.innerHTML = "";
 	}
 	
 	// Sort secrets alphabetically by name
@@ -820,7 +859,7 @@ VaultManagerWidget.prototype.updateSecretsList = function() {
 			
 			// Username cell
 			var usernameCell = self.document.createElement("td");
-			var username = vault && vault.fields["username-" + secret] ? vault.fields["username-" + secret] : "";
+			var username = usernameCache[secret] || "";
 			usernameCell.textContent = username;
 			
 			// Created cell
@@ -1023,9 +1062,13 @@ VaultManagerWidget.prototype.refresh = function(changedTiddlers) {
 					styleElement.textContent = this.getStyles();
 				}
 			}
-			// Re-render content for other changes
-			if(changedTiddlers["$:/secrets/vault"] || changedTiddlers["$:/state/vault/unlocked"]) {
+			// Re-render content for state changes
+			if(changedTiddlers["$:/state/vault/unlocked"]) {
 				this.renderContent();
+			}
+			// Just update the secrets list when vault changes
+			else if(changedTiddlers["$:/secrets/vault"] && this.secretsContainer && $tw.secretsManager && $tw.secretsManager.isUnlocked()) {
+				this.updateSecretsList();
 			}
 		}
 		return true;
