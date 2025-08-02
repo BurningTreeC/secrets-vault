@@ -793,7 +793,17 @@ SecretWidget.prototype.showPasswordPromptFallback = function(container, successC
 Compute the internal state of the widget
 */
 SecretWidget.prototype.execute = function() {
-	this.secretName = this.getAttribute("name","");
+	var rawName = this.getAttribute("name","");
+	
+	// Check if this is an encoded name by trying to decode it
+	// If it successfully decodes to something different, use the decoded version
+	if($tw.secretsManager && $tw.secretsManager.decodeSecretName) {
+		var decodedName = $tw.secretsManager.decodeSecretName(rawName);
+		// If the decoded name is different from the raw name, it was encoded
+		this.secretName = decodedName;
+	} else {
+		this.secretName = rawName;
+	}
 };
 
 /*

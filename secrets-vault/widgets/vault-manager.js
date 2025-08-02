@@ -116,10 +116,11 @@ VaultManagerWidget.prototype.getStyles = function() {
 		"button.danger:hover { opacity: 0.8; }",
 		".secrets-table { width: 100%; border-collapse: collapse; margin-top: 1em; table-layout: fixed; }",
 		".secrets-table th { text-align: left; padding: 0.5em; background: " + tableHeaderBackgroundColor + "; }",
-		".secrets-table th:first-child { width: 30%; }",
-		".secrets-table th:nth-child(2) { width: 25%; }",
-		".secrets-table th:nth-child(3) { width: 20%; }",
-		".secrets-table th:last-child { width: 25%; text-align: right; }",
+		".secrets-table th:first-child { width: 25%; }",
+		".secrets-table th:nth-child(2) { width: 20%; }",
+		".secrets-table th:nth-child(3) { width: 25%; }",
+		".secrets-table th:nth-child(4) { width: 15%; }",
+		".secrets-table th:last-child { width: 15%; text-align: right; }",
 		".secrets-table td { padding: 0.5em; border-bottom: 1px solid " + tableBorderColor + "; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }",
 		".secrets-table td:last-child { text-align: right; }",
 		".table-buttons { display: inline-flex; gap: 0.25em; justify-content: flex-end; }",
@@ -457,6 +458,21 @@ VaultManagerWidget.prototype.renderManage = function() {
 	}, true);
 	addForm.appendChild(usernameInput);
 	
+	var descriptionInput = this.document.createElement("input");
+	descriptionInput.type = "text";
+	descriptionInput.placeholder = "Description (optional)";
+	// Handle paste events
+	descriptionInput.addEventListener('paste', function(e) {
+		e.stopPropagation();
+	}, true);
+	descriptionInput.addEventListener('cut', function(e) {
+		e.stopPropagation();
+	}, true);
+	descriptionInput.addEventListener('copy', function(e) {
+		e.stopPropagation();
+	}, true);
+	addForm.appendChild(descriptionInput);
+	
 	var valueField = this.createPasswordInput("Secret value");
 	var valueInput = valueField.input;
 	addForm.appendChild(valueField.wrapper);
@@ -469,12 +485,20 @@ VaultManagerWidget.prototype.renderManage = function() {
 			self.showStatus("Please provide both name and value", true);
 			return;
 		}
+		
+		// Provide feedback about special characters but don't strip them
+		var specialCharsInName = nameInput.value.match(/[^\w\s-]/g);
+		if(specialCharsInName && specialCharsInName.length > 0) {
+			self.showStatus("Note: Secret name contains special characters. These will be encoded for storage.", false);
+		}
+		
 		if($tw.secretsManager) {
-			// Pass username to addSecret method which now handles encryption
-			$tw.secretsManager.addSecret(nameInput.value, valueInput.value, usernameInput.value).then(function() {
+			// Pass username and description to addSecret method
+			$tw.secretsManager.addSecret(nameInput.value, valueInput.value, usernameInput.value, descriptionInput.value).then(function() {
 				self.showStatus("Secret added successfully!");
 				nameInput.value = "";
 				usernameInput.value = "";
+				descriptionInput.value = "";
 				valueInput.value = "";
 				self.updateSecretsList();
 			}).catch(function(error) {
@@ -494,6 +518,11 @@ VaultManagerWidget.prototype.renderManage = function() {
 		}
 	};
 	usernameInput.onkeypress = function(e) {
+		if(e.key === "Enter") {
+			addSecretSubmit();
+		}
+	};
+	descriptionInput.onkeypress = function(e) {
 		if(e.key === "Enter") {
 			addSecretSubmit();
 		}
@@ -524,7 +553,7 @@ VaultManagerWidget.prototype.renderManage = function() {
 	
 	var searchInput = this.document.createElement("input");
 	searchInput.type = "text";
-	searchInput.placeholder = "Search by name or username...";
+	searchInput.placeholder = "Search by name, username, or description...";
 	searchInput.value = this.searchFilter;
 	searchInput.style.width = "100%";
 	searchInput.style.maxWidth = "400px";
@@ -773,11 +802,13 @@ VaultManagerWidget.prototype.updateSecretsList = function() {
 	var secrets = $tw.secretsManager ? $tw.secretsManager.listSecrets() : [];
 	var vault = $tw.wiki.getTiddler("$:/secrets/vault");
 	
-	// Create a map to store decrypted usernames
+	// Create maps to store decrypted usernames and descriptions
 	var usernamePromises = {};
+	var descriptionPromises = {};
 	var usernameCache = {};
+	var descriptionCache = {};
 	
-	// Start decrypting all usernames
+	// Start decrypting all usernames and descriptions
 	secrets.forEach(function(secret) {
 		usernamePromises[secret] = $tw.secretsManager.getUsername(secret).then(function(username) {
 			usernameCache[secret] = username;
@@ -786,13 +817,22 @@ VaultManagerWidget.prototype.updateSecretsList = function() {
 			usernameCache[secret] = "";
 			return "";
 		});
+		
+		descriptionPromises[secret] = $tw.secretsManager.getDescription(secret).then(function(description) {
+			descriptionCache[secret] = description;
+			return description;
+		}).catch(function() {
+			descriptionCache[secret] = "";
+			return "";
+		});
 	});
 	
 	// Mark this update as not cancelled
 	this.updateSecretsListCancelled = false;
 	
-	// Wait for all usernames to be decrypted before filtering
-	this.updateSecretsListPromise = Promise.all(Object.values(usernamePromises)).then(function() {
+	// Wait for all usernames and descriptions to be decrypted before filtering
+	var allPromises = Object.values(usernamePromises).concat(Object.values(descriptionPromises));
+	this.updateSecretsListPromise = Promise.all(allPromises).then(function() {
 		// Check if this update was cancelled
 		if(self.updateSecretsListCancelled) {
 			return;
@@ -805,17 +845,19 @@ VaultManagerWidget.prototype.updateSecretsList = function() {
 				var secretNameMatch = secret.toLowerCase().includes(filter);
 				var username = usernameCache[secret] || "";
 				var usernameMatch = username.toLowerCase().includes(filter);
-				return secretNameMatch || usernameMatch;
+				var description = descriptionCache[secret] || "";
+				var descriptionMatch = description.toLowerCase().includes(filter);
+				return secretNameMatch || usernameMatch || descriptionMatch;
 			});
 		}
 		
 		// Continue with rendering the filtered list
-		self.renderSecretsList(secrets, usernameCache);
+		self.renderSecretsList(secrets, usernameCache, descriptionCache);
 		self.updateSecretsListPromise = null;
 	});
 };
 
-VaultManagerWidget.prototype.renderSecretsList = function(secrets, usernameCache) {
+VaultManagerWidget.prototype.renderSecretsList = function(secrets, usernameCache, descriptionCache) {
 	var self = this;
 	var vault = $tw.wiki.getTiddler("$:/secrets/vault");
 	
@@ -839,12 +881,15 @@ VaultManagerWidget.prototype.renderSecretsList = function(secrets, usernameCache
 		nameHeader.textContent = "Name";
 		var usernameHeader = this.document.createElement("th");
 		usernameHeader.textContent = "Username";
+		var descriptionHeader = this.document.createElement("th");
+		descriptionHeader.textContent = "Description";
 		var createdHeader = this.document.createElement("th");
 		createdHeader.textContent = "Created";
 		var actionsHeader = this.document.createElement("th");
 		actionsHeader.textContent = "Actions";
 		headerRow.appendChild(nameHeader);
 		headerRow.appendChild(usernameHeader);
+		headerRow.appendChild(descriptionHeader);
 		headerRow.appendChild(createdHeader);
 		headerRow.appendChild(actionsHeader);
 		thead.appendChild(headerRow);
@@ -862,9 +907,17 @@ VaultManagerWidget.prototype.renderSecretsList = function(secrets, usernameCache
 			var username = usernameCache[secret] || "";
 			usernameCell.textContent = username;
 			
+			// Description cell
+			var descriptionCell = self.document.createElement("td");
+			var description = descriptionCache[secret] || "";
+			descriptionCell.textContent = description;
+			descriptionCell.title = description; // Show full description on hover
+			
 			// Created cell
 			var createdCell = self.document.createElement("td");
-			var metaField = vault && vault.fields["meta-" + secret];
+			// Need to encode the secret name to find the metadata
+			var encodedName = $tw.secretsManager ? $tw.secretsManager.encodeSecretName(secret) : secret;
+			var metaField = vault && (vault.fields["meta-" + encodedName] || vault.fields["meta-" + secret]);
 			if(metaField) {
 				try {
 					var meta = JSON.parse(metaField);
@@ -998,6 +1051,7 @@ VaultManagerWidget.prototype.renderSecretsList = function(secrets, usernameCache
 			actionsCell.appendChild(buttonContainer);
 			row.appendChild(nameCell);
 			row.appendChild(usernameCell);
+			row.appendChild(descriptionCell);
 			row.appendChild(createdCell);
 			row.appendChild(actionsCell);
 			tbody.appendChild(row);

@@ -431,7 +431,30 @@ SecretsManager.prototype.lock = function() {
 	$tw.wiki.addTiddler({title: "$:/state/vault/unlocked", text: "no"});
 };
 
-SecretsManager.prototype.addSecret = function(name, value, username) {
+SecretsManager.prototype.encodeSecretName = function(name) {
+	// Use base64 encoding for field names to support any character
+	// Encode to base64url (URL-safe base64) to avoid issues with + and /
+	var base64 = btoa(unescape(encodeURIComponent(name)));
+	return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+};
+
+SecretsManager.prototype.decodeSecretName = function(encodedName) {
+	// Decode from base64url back to original name
+	// Add back padding if needed
+	var base64 = encodedName.replace(/-/g, '+').replace(/_/g, '/');
+	var padding = base64.length % 4;
+	if(padding) {
+		base64 += '='.repeat(4 - padding);
+	}
+	try {
+		return decodeURIComponent(escape(atob(base64)));
+	} catch(e) {
+		// Fallback for old format (non-encoded names)
+		return encodedName;
+	}
+};
+
+SecretsManager.prototype.addSecret = function(name, value, username, description) {
 	var self = this;
 	if(!this.isUnlocked()) {
 		return Promise.reject(new Error("Vault is locked"));
@@ -445,26 +468,44 @@ SecretsManager.prototype.addSecret = function(name, value, username) {
 		return Promise.reject(new Error("Invalid secret name"));
 	}
 	
-	// Sanitize name to prevent injection
-	name = name.replace(/[^a-zA-Z0-9-_ ]/g, "");
+	// Encode the name for use as field key
+	var encodedName = this.encodeSecretName(name);
 	
-	// Encrypt both secret and username if provided
+	// Check if secret already exists
+	var vault = $tw.wiki.getTiddler("$:/secrets/vault");
+	if(vault && (vault.fields["secret-" + encodedName] || vault.fields["secret-" + name])) {
+		return Promise.reject(new Error("A secret with the name '" + name + "' already exists"));
+	}
+	
+	// Encrypt secret, username, and description if provided
 	var encryptPromises = [this.encrypt(value)];
 	if(username && username.length > 0) {
 		encryptPromises.push(this.encrypt(username));
+	} else {
+		encryptPromises.push(Promise.resolve(null));
+	}
+	if(description && description.length > 0) {
+		encryptPromises.push(this.encrypt(description));
+	} else {
+		encryptPromises.push(Promise.resolve(null));
 	}
 	
 	return Promise.all(encryptPromises).then(function(encrypted) {
 		var vault = $tw.wiki.getTiddler("$:/secrets/vault") || {};
 		var fields = Object.assign({}, vault.fields);
-		fields["secret-" + name] = encrypted[0];
-		fields["meta-" + name] = JSON.stringify({
+		fields["secret-" + encodedName] = encrypted[0];
+		fields["meta-" + encodedName] = JSON.stringify({
 			created: Date.now(),
-			modified: Date.now()
+			modified: Date.now(),
+			originalName: name // Store original name for display
 		});
 		// Store encrypted username if provided
 		if(encrypted[1]) {
-			fields["username-" + name] = encrypted[1];
+			fields["username-" + encodedName] = encrypted[1];
+		}
+		// Store encrypted description if provided
+		if(encrypted[2]) {
+			fields["description-" + encodedName] = encrypted[2];
 		}
 		$tw.wiki.addTiddler(new $tw.Tiddler(vault, fields));
 		return true;
@@ -479,15 +520,21 @@ SecretsManager.prototype.getSecret = function(name) {
 	// Update activity for auto-lock
 	this.updateActivity();
 	
-	// Sanitize name
-	name = name.replace(/[^a-zA-Z0-9-_ ]/g, "");
+	// Encode the name for field lookup
+	var encodedName = this.encodeSecretName(name);
 	
 	var vault = $tw.wiki.getTiddler("$:/secrets/vault");
-	if(!vault || !vault.fields["secret-" + name]) {
+	if(!vault) {
 		return Promise.reject(new Error("Secret not found"));
 	}
 	
-	return this.decrypt(vault.fields["secret-" + name]);
+	// Try encoded name first, fall back to old format
+	var secretField = vault.fields["secret-" + encodedName] || vault.fields["secret-" + name];
+	if(!secretField) {
+		return Promise.reject(new Error("Secret not found"));
+	}
+	
+	return this.decrypt(secretField);
 };
 
 SecretsManager.prototype.getUsername = function(name) {
@@ -498,16 +545,19 @@ SecretsManager.prototype.getUsername = function(name) {
 	// Update activity for auto-lock
 	this.updateActivity();
 	
-	// Sanitize name
-	name = name.replace(/[^a-zA-Z0-9-_ ]/g, "");
+	// Encode the name for field lookup
+	var encodedName = this.encodeSecretName(name);
 	
 	var vault = $tw.wiki.getTiddler("$:/secrets/vault");
-	if(!vault || !vault.fields["username-" + name]) {
+	if(!vault) {
 		return Promise.resolve(""); // Return empty string if no username
 	}
 	
-	// Check if username is encrypted (new format) or plain text (old format)
-	var usernameField = vault.fields["username-" + name];
+	// Try encoded name first, fall back to old format
+	var usernameField = vault.fields["username-" + encodedName] || vault.fields["username-" + name];
+	if(!usernameField) {
+		return Promise.resolve(""); // Return empty string if no username
+	}
 	
 	// Try to decrypt - if it fails, it's probably plain text (old format)
 	return this.decrypt(usernameField).catch(function() {
@@ -516,24 +566,171 @@ SecretsManager.prototype.getUsername = function(name) {
 	});
 };
 
+SecretsManager.prototype.getDescription = function(name) {
+	if(!this.isUnlocked()) {
+		return Promise.reject(new Error("Vault is locked"));
+	}
+	
+	// Update activity for auto-lock
+	this.updateActivity();
+	
+	// Encode the name for field lookup
+	var encodedName = this.encodeSecretName(name);
+	
+	var vault = $tw.wiki.getTiddler("$:/secrets/vault");
+	if(!vault) {
+		return Promise.resolve(""); // Return empty string if no description
+	}
+	
+	// Try encoded name first, fall back to old format
+	var descriptionField = vault.fields["description-" + encodedName] || vault.fields["description-" + name];
+	if(!descriptionField) {
+		return Promise.resolve(""); // Return empty string if no description
+	}
+	
+	return this.decrypt(descriptionField);
+};
+
 SecretsManager.prototype.listSecrets = function() {
 	// Update activity for auto-lock if unlocked
 	if(this.isUnlocked()) {
 		this.updateActivity();
 	}
 	
+	var self = this;
 	var vault = $tw.wiki.getTiddler("$:/secrets/vault");
 	if(!vault) {
 		return [];
 	}
 	
 	var secrets = [];
-	$tw.utils.each(vault.fields, function(value, name) {
-		if(name.indexOf("secret-") === 0) {
-			secrets.push(name.substring(7));
+	var processedKeys = {}; // Track processed keys to avoid duplicates
+	
+	$tw.utils.each(vault.fields, function(value, fieldName) {
+		if(fieldName.indexOf("secret-") === 0) {
+			var encodedName = fieldName.substring(7);
+			
+			// Skip if we've already processed this secret
+			if(processedKeys[encodedName]) {
+				return;
+			}
+			processedKeys[encodedName] = true;
+			
+			// Check if there's metadata with the original name
+			var metaField = vault.fields["meta-" + encodedName];
+			if(metaField) {
+				try {
+					var meta = JSON.parse(metaField);
+					if(meta.originalName) {
+						secrets.push(meta.originalName);
+						return;
+					}
+				} catch(e) {
+					// Fall through to decoding
+				}
+			}
+			
+			// Try to decode the name
+			var decodedName = self.decodeSecretName(encodedName);
+			secrets.push(decodedName);
 		}
 	});
 	return secrets;
+};
+
+SecretsManager.prototype.updateSecret = function(name, value, username, description) {
+	var self = this;
+	if(!this.isUnlocked()) {
+		return Promise.reject(new Error("Vault is locked"));
+	}
+	
+	// Update activity for auto-lock
+	this.updateActivity();
+	
+	// Encode the name for field lookup
+	var encodedName = this.encodeSecretName(name);
+	
+	var vault = $tw.wiki.getTiddler("$:/secrets/vault");
+	if(!vault) {
+		return Promise.reject(new Error("Secret not found"));
+	}
+	
+	// Check if secret exists (try both encoded and old format)
+	var secretField = vault.fields["secret-" + encodedName] || vault.fields["secret-" + name];
+	if(!secretField) {
+		return Promise.reject(new Error("Secret not found"));
+	}
+	
+	// Determine which format is being used
+	var fieldKey = vault.fields["secret-" + encodedName] ? encodedName : name;
+	
+	// Encrypt the new values
+	var encryptPromises = [this.encrypt(value)];
+	if(username !== undefined) {
+		if(username && username.length > 0) {
+			encryptPromises.push(this.encrypt(username));
+		} else {
+			encryptPromises.push(Promise.resolve(null));
+		}
+	} else {
+		encryptPromises.push(Promise.resolve(undefined)); // Keep existing
+	}
+	
+	if(description !== undefined) {
+		if(description && description.length > 0) {
+			encryptPromises.push(this.encrypt(description));
+		} else {
+			encryptPromises.push(Promise.resolve(null));
+		}
+	} else {
+		encryptPromises.push(Promise.resolve(undefined)); // Keep existing
+	}
+	
+	return Promise.all(encryptPromises).then(function(encrypted) {
+		var fields = Object.assign({}, vault.fields);
+		
+		// Update secret value
+		fields["secret-" + fieldKey] = encrypted[0];
+		
+		// Update metadata
+		var metaField = fields["meta-" + fieldKey];
+		var meta = {};
+		if(metaField) {
+			try {
+				meta = JSON.parse(metaField);
+			} catch(e) {
+				meta = {created: Date.now()};
+			}
+		} else {
+			meta = {created: Date.now()};
+		}
+		meta.modified = Date.now();
+		if(fieldKey === encodedName && name !== encodedName) {
+			meta.originalName = name; // Store original name for encoded fields
+		}
+		fields["meta-" + fieldKey] = JSON.stringify(meta);
+		
+		// Update username if provided
+		if(encrypted[1] !== undefined) {
+			if(encrypted[1]) {
+				fields["username-" + fieldKey] = encrypted[1];
+			} else {
+				delete fields["username-" + fieldKey];
+			}
+		}
+		
+		// Update description if provided
+		if(encrypted[2] !== undefined) {
+			if(encrypted[2]) {
+				fields["description-" + fieldKey] = encrypted[2];
+			} else {
+				delete fields["description-" + fieldKey];
+			}
+		}
+		
+		$tw.wiki.addTiddler(new $tw.Tiddler(fields));
+		return true;
+	});
 };
 
 SecretsManager.prototype.deleteSecret = function(name) {
@@ -544,18 +741,27 @@ SecretsManager.prototype.deleteSecret = function(name) {
 	// Update activity for auto-lock
 	this.updateActivity();
 	
-	// Sanitize name
-	name = name.replace(/[^a-zA-Z0-9-_ ]/g, "");
+	// Encode the name for field lookup
+	var encodedName = this.encodeSecretName(name);
 	
 	var vault = $tw.wiki.getTiddler("$:/secrets/vault");
-	if(!vault || !vault.fields["secret-" + name]) {
+	if(!vault) {
+		return Promise.reject(new Error("Secret not found"));
+	}
+	
+	// Check both encoded and old format
+	var hasSecret = vault.fields["secret-" + encodedName] || vault.fields["secret-" + name];
+	if(!hasSecret) {
 		return Promise.reject(new Error("Secret not found"));
 	}
 	
 	var fields = Object.assign({}, vault.fields);
-	delete fields["secret-" + name];
-	delete fields["meta-" + name];
-	delete fields["username-" + name];
+	// Delete all related fields (try both encoded and old format)
+	["secret-", "meta-", "username-", "description-"].forEach(function(prefix) {
+		delete fields[prefix + encodedName];
+		delete fields[prefix + name]; // Also try old format
+	});
+	
 	// Create a new tiddler with only the remaining fields
 	$tw.wiki.addTiddler(new $tw.Tiddler(fields));
 	
@@ -588,8 +794,9 @@ SecretsManager.prototype.changePassword = function(oldPassword, newPassword) {
 		// Get all secrets before changing the password
 		var vault = $tw.wiki.getTiddler("$:/secrets/vault");
 		
-		// Decrypt all secrets and usernames with old key
+		// Decrypt all secrets, usernames, and descriptions with old key
 		var decryptPromises = [];
+		var descriptions = {};
 		$tw.utils.each(vault.fields, function(value, name) {
 			if(name.indexOf("secret-") === 0 && name.indexOf("secret-meta-") !== 0) {
 				decryptPromises.push(
@@ -605,6 +812,13 @@ SecretsManager.prototype.changePassword = function(oldPassword, newPassword) {
 					}).catch(function() {
 						// Plain text username (old format)
 						usernames[name.substring(9)] = value;
+					})
+				);
+			} else if(name.indexOf("description-") === 0) {
+				// Decrypt descriptions
+				decryptPromises.push(
+					self.decrypt(value).then(function(decrypted) {
+						descriptions[name.substring(12)] = decrypted;
 					})
 				);
 			} else if(name.indexOf("meta-") === 0) {
@@ -664,6 +878,15 @@ SecretsManager.prototype.changePassword = function(oldPassword, newPassword) {
 				encryptPromises.push(
 					self.encrypt(value).then(function(encrypted) {
 						newFields["username-" + name] = encrypted;
+					})
+				);
+			});
+			
+			// Re-encrypt all descriptions
+			$tw.utils.each(descriptions, function(value, name) {
+				encryptPromises.push(
+					self.encrypt(value).then(function(encrypted) {
+						newFields["description-" + name] = encrypted;
 					})
 				);
 			});
