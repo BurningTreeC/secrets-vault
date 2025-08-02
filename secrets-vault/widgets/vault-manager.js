@@ -1066,9 +1066,17 @@ VaultManagerWidget.prototype.refresh = function(changedTiddlers) {
 			if(changedTiddlers["$:/state/vault/unlocked"]) {
 				this.renderContent();
 			}
-			// Just update the secrets list when vault changes
-			else if(changedTiddlers["$:/secrets/vault"] && this.secretsContainer && $tw.secretsManager && $tw.secretsManager.isUnlocked()) {
-				this.updateSecretsList();
+			// Re-render content when vault changes (including deletion)
+			else if(changedTiddlers["$:/secrets/vault"]) {
+				// Check if vault was deleted or if it's no longer valid
+				var vault = $tw.wiki.getTiddler("$:/secrets/vault");
+				if(!vault || !vault.fields["secrets-verification"]) {
+					// Vault was deleted or is invalid, re-render everything
+					this.renderContent();
+				} else if(this.secretsContainer && $tw.secretsManager && $tw.secretsManager.isUnlocked()) {
+					// Vault still exists and is unlocked, just update the secrets list
+					this.updateSecretsList();
+				}
 			}
 		}
 		return true;
